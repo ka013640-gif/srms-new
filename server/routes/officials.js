@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { logActivity } from './activity.js';
 
 const router = express.Router();
 
@@ -41,18 +42,20 @@ router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { name, position, contact, term_start, term_end, is_active } = req.body;
 
-    const official = await prisma.official.create({
-      data: {
-        name,
-        position,
-        contact,
-        term_start: term_start ? new Date(term_start) : new Date(),
-        term_end: term_end ? new Date(term_end) : null,
-        is_active: is_active ?? true
-      }
-    });
+const official = await prisma.official.create({
+       data: {
+         name,
+         position,
+         contact,
+         term_start: term_start ? new Date(term_start) : new Date(),
+         term_end: term_end ? new Date(term_end) : null,
+         is_active: is_active ?? true
+       }
+     });
 
-    res.status(201).json({ message: 'Official added', official });
+    await logActivity(req.user.id, 'CREATE_OFFICIAL', { official_id: official.official_id, name: official.name }, req);
+
+     res.status(201).json({ message: 'Official added', official });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to create official' });
@@ -64,19 +67,21 @@ router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) =
   try {
     const { name, position, contact, term_start, term_end, is_active } = req.body;
 
-    const official = await prisma.official.update({
-      where: { official_id: parseInt(req.params.official_id) },
-      data: {
-        name,
-        position,
-        contact,
-        term_start: term_start ? new Date(term_start) : undefined,
-        term_end: term_end ? new Date(term_end) : undefined,
-        is_active
-      }
-    });
+const official = await prisma.official.update({
+       where: { official_id: parseInt(req.params.official_id) },
+       data: {
+         name,
+         position,
+         contact,
+         term_start: term_start ? new Date(term_start) : undefined,
+         term_end: term_end ? new Date(term_end) : undefined,
+         is_active
+       }
+     });
 
-    res.json({ message: 'Official updated', official });
+    await logActivity(req.user.id, 'UPDATE_OFFICIAL', { official_id: official.official_id, name: official.name }, req);
+
+     res.json({ message: 'Official updated', official });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update official' });
@@ -94,12 +99,14 @@ router.delete('/:official_id', authenticate, authorize('ADMIN'), async (req, res
       return res.status(404).json({ error: 'Official not found' });
     }
 
-    await prisma.official.update({
-      where: { official_id: parseInt(req.params.official_id) },
-      data: { deleted_at: new Date() }
-    });
+await prisma.official.update({
+       where: { official_id: parseInt(req.params.official_id) },
+       data: { deleted_at: new Date() }
+     });
 
-    res.json({ message: 'Official moved to archives' });
+    await logActivity(req.user.id, 'DELETE_OFFICIAL', { official_id: official.official_id, name: official.name }, req);
+
+     res.json({ message: 'Official moved to archives' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to remove official' });

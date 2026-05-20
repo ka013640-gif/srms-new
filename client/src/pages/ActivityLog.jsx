@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Typography, Box, Paper, CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import { Timeline, Event, AccountCircle } from '@mui/icons-material';
+import { Typography, Box, Paper, CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip } from '@mui/material';
+import { AccountCircle } from '@mui/icons-material';
 import api from '../services/api';
 
 const ActivityLog = () => {
@@ -22,6 +22,26 @@ const ActivityLog = () => {
     }
   };
 
+  const renderDetails = (details) => {
+    if (!details) return '-';
+    try {
+      const parsed = JSON.parse(details);
+      if (typeof parsed === 'object') {
+        return Object.entries(parsed).map(([key, value]) => `${key}: ${value}`).join(', ');
+      }
+      return details;
+    } catch {
+      return details;
+    }
+  };
+
+  const getActionColor = (action) => {
+    if (action.includes('CREATE')) return 'success';
+    if (action.includes('UPDATE')) return 'info';
+    if (action.includes('DELETE')) return 'error';
+    return 'default';
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
@@ -36,37 +56,45 @@ const ActivityLog = () => {
         Activity Log
       </Typography>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-        <Table>
-          <TableHead sx={{ bgcolor: '#f8fafc' }}>
-            <TableRow>
-              <TableCell>User</TableCell>
-              <TableCell>Action</TableCell>
-              <TableCell>Details</TableCell>
-              <TableCell>IP Address</TableCell>
-              <TableCell>Timestamp</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {activities.map((activity) => (
-              <TableRow key={activity.id} hover>
-                <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AccountCircle fontSize="small" color="action" />
-                    {activity.user?.fullName || activity.user?.username || 'Unknown'}
-                  </Box>
-                </TableCell>
-                <TableCell>{activity.action}</TableCell>
-                <TableCell>{activity.details || '-'}</TableCell>
-                <TableCell>{activity.ip_address || '-'}</TableCell>
-                <TableCell>
-                  {new Date(activity.created_at).toLocaleString()}
-                </TableCell>
+      {activities.length === 0 ? (
+        <Typography variant="body1" color="#64748b" textAlign="center" py={4}>
+          No activities recorded
+        </Typography>
+      ) : (
+        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+          <Table>
+            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+              <TableRow>
+                <TableCell>User</TableCell>
+                <TableCell>Action</TableCell>
+                <TableCell>Details</TableCell>
+                <TableCell>IP Address</TableCell>
+                <TableCell>Timestamp</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {activities.map((activity) => (
+                <TableRow key={activity.activity_log_id} hover>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <AccountCircle fontSize="small" color="action" />
+                      {activity.user?.fullName || activity.user?.username || 'Unknown'}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip label={activity.action} color={getActionColor(activity.action)} size="small" />
+                  </TableCell>
+                  <TableCell>{renderDetails(activity.details)}</TableCell>
+                  <TableCell>{activity.ip_address || '-'}</TableCell>
+                  <TableCell>
+                    {new Date(activity.created_at).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Box>
   );
 };

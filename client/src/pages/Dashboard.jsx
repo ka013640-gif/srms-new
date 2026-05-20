@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Typography, Box, Grid, Paper, CircularProgress } from '@mui/material';
+import { Typography, Box, Grid, Paper, CircularProgress, Chip } from '@mui/material';
 import { People, FolderOpen, Description } from '@mui/icons-material';
 import api from '../services/api';
 
@@ -50,10 +50,33 @@ const Dashboard = () => {
   }, []);
 
   const getActivityColor = (action) => {
-    if (action.includes('resident')) return 'blue';
-    if (action.includes('document')) return 'green';
-    if (action.includes('project')) return 'orange';
-    return 'gray';
+    if (action.includes('CREATE')) return 'success';
+    if (action.includes('UPDATE')) return 'info';
+    if (action.includes('DELETE')) return 'error';
+    if (action.includes('resident')) return 'primary';
+    if (action.includes('document')) return 'success';
+    if (action.includes('project')) return 'secondary';
+    if (action.includes('session')) return 'warning';
+    return 'default';
+  };
+
+  const renderActivityDetails = (activity) => {
+    if (!activity.details) return activity.action.replace(/_/g, ' ').toLowerCase();
+    try {
+      const parsed = JSON.parse(activity.details);
+      if (typeof parsed === 'object') {
+        const parts = [];
+        for (const [key, value] of Object.entries(parsed)) {
+          if (key !== 'id' && key !== 'user_id') {
+            parts.push(`${value}`);
+          }
+        }
+        return parts.length > 0 ? parts.join(' - ') : activity.action.replace(/_/g, ' ').toLowerCase();
+      }
+      return activity.details;
+    } catch {
+      return activity.details;
+    }
   };
 
   return (
@@ -174,33 +197,45 @@ const Dashboard = () => {
             <Typography variant="h6" fontWeight={600} color="#1e293b" mb={2}>
               Recent Activities
             </Typography>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : activities.length > 0 ? (
-              <Box>
-                {activities.map((activity, index) => (
-                  <Box
-                    key={activity.id || index}
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      py: 2,
-                      borderBottom: index < activities.length - 1 ? '1px solid #f1f5f9' : 'none'
-                    }}
-                  >
-                    <Typography variant="body2" color="#1e293b">
-                      {activity.action}
-                      {activity.details && `: ${activity.details}`}
-                    </Typography>
-                    <Typography variant="caption" color="#94a3b8">
-                      {new Date(activity.created_at).toLocaleString()}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            ) : (
+{loading ? (
+               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                 <CircularProgress />
+               </Box>
+             ) : activities.length > 0 ? (
+               <Box>
+                 {activities.map((activity, index) => (
+                   <Box
+                     key={activity.activity_log_id || index}
+                     sx={{
+                       display: 'flex',
+                       justifyContent: 'space-between',
+                       py: 2,
+                       borderBottom: index < activities.length - 1 ? '1px solid #f1f5f9' : 'none'
+                     }}
+                   >
+                     <Box>
+                       <Chip
+                         label={activity.action.replace(/_/g, ' ')}
+                         color={getActivityColor(activity.action)}
+                         size="small"
+                         sx={{ mb: 0.5 }}
+                       />
+                       <Typography variant="body2" color="#1e293b">
+                         {renderActivityDetails(activity)}
+                       </Typography>
+                       {activity.user?.fullName && (
+                         <Typography variant="caption" color="#64748b" display="block">
+                           by {activity.user.fullName}
+                         </Typography>
+                       )}
+                     </Box>
+                     <Typography variant="caption" color="#94a3b8">
+                       {new Date(activity.created_at).toLocaleString()}
+                     </Typography>
+                   </Box>
+                 ))}
+               </Box>
+             ) : (
               <Typography variant="body2" color="#64748b" textAlign="center" py={4}>
                 No recent activities
               </Typography>

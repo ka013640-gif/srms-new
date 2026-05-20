@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { logActivity } from './activity.js';
 
 const router = express.Router();
 
@@ -54,19 +55,21 @@ router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { title, description, date, time, location, attendees, status } = req.body;
 
-    const session = await prisma.session.create({
-      data: {
-        title,
-        description,
-        date: new Date(date),
-        time,
-        location,
-        attendees: attendees ? JSON.stringify(attendees) : null,
-        status
-      }
-    });
+const session = await prisma.session.create({
+       data: {
+         title,
+         description,
+         date: new Date(date),
+         time,
+         location,
+         attendees: attendees ? JSON.stringify(attendees) : null,
+         status
+       }
+     });
 
-    res.status(201).json({ message: 'Session created', session });
+    await logActivity(req.user.id, 'CREATE_SESSION', { session_id: session.session_id, title: session.title }, req);
+
+     res.status(201).json({ message: 'Session created', session });
   } catch (error) {
     console.error('Create session error:', error);
     res.status(500).json({ error: 'Failed to create session', details: error.message });
@@ -76,15 +79,17 @@ router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
 // PUT /api/sessions/:session_id (Admin only)
 router.put('/:session_id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const session = await prisma.session.update({
-      where: { session_id: parseInt(req.params.session_id) },
-      data: {
-        ...req.body,
-        date: req.body.date ? new Date(req.body.date) : undefined
-      }
-    });
+const session = await prisma.session.update({
+       where: { session_id: parseInt(req.params.session_id) },
+       data: {
+         ...req.body,
+         date: req.body.date ? new Date(req.body.date) : undefined
+       }
+     });
 
-    res.json({ message: 'Session updated', session });
+    await logActivity(req.user.id, 'UPDATE_SESSION', { session_id: session.session_id, title: session.title }, req);
+
+     res.json({ message: 'Session updated', session });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update session' });
   }
@@ -101,12 +106,14 @@ router.delete('/:session_id', authenticate, authorize('ADMIN'), async (req, res)
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    await prisma.session.update({
-      where: { session_id: parseInt(req.params.session_id) },
-      data: { deleted_at: new Date() }
-    });
+await prisma.session.update({
+       where: { session_id: parseInt(req.params.session_id) },
+       data: { deleted_at: new Date() }
+     });
 
-    res.json({ message: 'Session moved to archives' });
+    await logActivity(req.user.id, 'DELETE_SESSION', { session_id: session.session_id, title: session.title }, req);
+
+     res.json({ message: 'Session moved to archives' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete session' });
   }

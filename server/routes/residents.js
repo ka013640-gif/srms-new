@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { validate, residentValidation } from '../middleware/validate.js';
+import { logActivity } from './activity.js';
 
 const router = express.Router();
 
@@ -120,6 +121,8 @@ router.post('/', authenticate, async (req, res) => {
 
     const resident = await prisma.resident.create({ data });
 
+    await logActivity(req.user.id, 'CREATE_RESIDENT', { full_name: resident.full_name }, req);
+
     res.status(201).json({ message: 'Resident profile created', resident });
   } catch (error) {
     console.error('Create resident error:', error);
@@ -146,15 +149,17 @@ router.put('/:id', authenticate, async (req, res) => {
       }
     }
 
-    const updated = await prisma.resident.update({
-      where: { resident_id: parseInt(req.params.id) },
-      data: {
-        ...rest,
-        birthday: birthday ? new Date(birthday) : undefined
-      }
-    });
+const updated = await prisma.resident.update({
+       where: { resident_id: parseInt(req.params.id) },
+       data: {
+         ...rest,
+         birthday: birthday ? new Date(birthday) : undefined
+       }
+     });
 
-    res.json({ message: 'Resident updated', resident: updated });
+    await logActivity(req.user.id, 'UPDATE_RESIDENT', { resident_id: updated.resident_id, full_name: updated.full_name }, req);
+
+     res.json({ message: 'Resident updated', resident: updated });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update resident', details: error.message });
@@ -172,12 +177,14 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
       return res.status(404).json({ error: 'Resident not found' });
     }
 
-    await prisma.resident.update({
-      where: { resident_id: parseInt(req.params.id) },
-      data: { deleted_at: new Date() }
-    });
+await prisma.resident.update({
+       where: { resident_id: parseInt(req.params.id) },
+       data: { deleted_at: new Date() }
+     });
 
-    res.json({ message: 'Resident moved to archives' });
+    await logActivity(req.user.id, 'DELETE_RESIDENT', { resident_id: resident.resident_id, full_name: resident.full_name }, req);
+
+     res.json({ message: 'Resident moved to archives' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete resident' });
   }

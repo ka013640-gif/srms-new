@@ -4,6 +4,22 @@ import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Helper to log activity
+export const logActivity = async (userId, action, details = null, req = null) => {
+  try {
+    await prisma.activityLog.create({
+      data: {
+        user_id: userId,
+        action,
+        details: details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null,
+        ip_address: req?.ip || req?.connection?.remoteAddress
+      }
+    });
+  } catch (error) {
+    console.error('Failed to log activity:', error);
+  }
+};
+
 // GET /api/activity/log
 router.get('/log', authenticate, authorize('ADMIN'), async (req, res) => {
   try {

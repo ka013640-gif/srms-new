@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { logActivity } from './activity.js';
 
 const router = express.Router();
 
@@ -129,29 +130,31 @@ router.post('/', authenticate, uploadMany.array('files', 10), async (req, res) =
        userId = req.user.id;
      }
 
-    const request = await prisma.documentRequest.create({
-      data: {
-        user_id: userId,
-        type,
-        purpose,
-        file_path: files.length > 0 ? `/uploads/documents/${files[0].filename}` : null,
-        ...(files.length > 0 && {
-          attachments: {
-            create: files.map(f => ({
-              file_path: `/uploads/documents/${f.filename}`,
-              file_name: f.originalname,
-              is_admin: false
-            }))
-          }
-        })
-      },
-      include: {
-        user: { select: { fullName: true, username: true } },
-        attachments: true
-      }
-    });
+const request = await prisma.documentRequest.create({
+       data: {
+         user_id: userId,
+         type,
+         purpose,
+         file_path: files.length > 0 ? `/uploads/documents/${files[0].filename}` : null,
+         ...(files.length > 0 && {
+           attachments: {
+             create: files.map(f => ({
+               file_path: `/uploads/documents/${f.filename}`,
+               file_name: f.originalname,
+               is_admin: false
+             }))
+           }
+         })
+       },
+       include: {
+         user: { select: { fullName: true, username: true } },
+         attachments: true
+       }
+     });
 
-    res.status(201).json({ message: 'Request submitted', request });
+    await logActivity(req.user.id, 'CREATE_DOCUMENT_REQUEST', { document_request_id: request.document_request_id, type: request.type }, req);
+
+     res.status(201).json({ message: 'Request submitted', request });
   } catch (error) {
     console.error('Create document error:', error);
     res.status(500).json({ error: 'Failed to create request', details: error.message });
@@ -255,23 +258,25 @@ router.put('/:id/status', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Cannot modify a resolved request' });
     }
 
-    const updated = await prisma.documentRequest.update({
-      where: { document_request_id: parseInt(req.params.id) },
-      data: {
-        status,
-        notes,
-        processed_at: new Date()
-      },
-      include: {
-        user: { select: { fullName: true, username: true } },
-        attachments: {
-          where: { is_deleted: false },
-          orderBy: { created_at: 'asc' }
-        }
-      }
-    });
+const updated = await prisma.documentRequest.update({
+       where: { document_request_id: parseInt(req.params.id) },
+       data: {
+         status,
+         notes,
+         processed_at: new Date()
+       },
+       include: {
+         user: { select: { fullName: true, username: true } },
+         attachments: {
+           where: { is_deleted: false },
+           orderBy: { created_at: 'asc' }
+         }
+       }
+     });
 
-    res.json({ message: 'Request updated', request: updated });
+    await logActivity(req.user.id, 'UPDATE_DOCUMENT_REQUEST', { document_request_id: updated.document_request_id, status: updated.status }, req);
+
+     res.json({ message: 'Request updated', request: updated });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update request' });
@@ -390,12 +395,14 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    await prisma.documentRequest.update({
-      where: { document_request_id: requestId },
-      data: { deleted_at: new Date() }
-    });
+await prisma.documentRequest.update({
+       where: { document_request_id: requestId },
+       data: { deleted_at: new Date() }
+     });
 
-    res.json({ message: 'Request moved to archives' });
+    await logActivity(req.user.id, 'DELETE_DOCUMENT_REQUEST', { document_request_id: request.document_request_id, type: request.type }, req);
+
+     res.json({ message: 'Request moved to archives' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to archive request' });

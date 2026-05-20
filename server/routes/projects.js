@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { validate, projectValidation } from '../middleware/validate.js';
+import { logActivity } from './activity.js';
 
 const router = express.Router();
 
@@ -40,11 +41,13 @@ router.get('/:project_id', authenticate, async (req, res) => {
 // POST /api/projects (Admin only)
 router.post('/', authenticate, authorize('ADMIN'), validate(projectValidation), async (req, res) => {
   try {
-    const project = await prisma.project.create({
-      data: req.body
-    });
+const project = await prisma.project.create({
+       data: req.body
+     });
 
-    res.status(201).json({ message: 'Project created', project });
+    await logActivity(req.user.id, 'CREATE_PROJECT', { project_id: project.project_id, name: project.name }, req);
+
+     res.status(201).json({ message: 'Project created', project });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create project' });
   }
@@ -53,12 +56,14 @@ router.post('/', authenticate, authorize('ADMIN'), validate(projectValidation), 
 // PUT /api/projects/:project_id (Admin only)
 router.put('/:project_id', authenticate, authorize('ADMIN'), validate(projectValidation), async (req, res) => {
   try {
-    const project = await prisma.project.update({
-      where: { project_id: parseInt(req.params.project_id) },
-      data: req.body
-    });
+const project = await prisma.project.update({
+       where: { project_id: parseInt(req.params.project_id) },
+       data: req.body
+     });
 
-    res.json({ message: 'Project updated', project });
+    await logActivity(req.user.id, 'UPDATE_PROJECT', { project_id: project.project_id, name: project.name }, req);
+
+     res.json({ message: 'Project updated', project });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update project' });
   }
@@ -75,12 +80,14 @@ router.delete('/:project_id', authenticate, authorize('ADMIN'), async (req, res)
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    await prisma.project.update({
-      where: { project_id: parseInt(req.params.project_id) },
-      data: { deleted_at: new Date() }
-    });
+await prisma.project.update({
+       where: { project_id: parseInt(req.params.project_id) },
+       data: { deleted_at: new Date() }
+     });
 
-    res.json({ message: 'Project moved to archives' });
+    await logActivity(req.user.id, 'DELETE_PROJECT', { project_id: project.project_id, name: project.name }, req);
+
+     res.json({ message: 'Project moved to archives' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete project' });
   }
