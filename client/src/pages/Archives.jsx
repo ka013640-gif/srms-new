@@ -100,7 +100,15 @@ const Archives = () => {
       case 'OFFICIAL':
         return entry.name;
       case 'DOCUMENT_REQUEST':
-        return entry.type;
+        return (
+          <Box>
+            <Typography variant="body2" fontWeight={600}>{entry.type}</Typography>
+            <Typography variant="caption" color="text.secondary">by {entry.user?.fullName || 'Unknown'}</Typography>
+            {entry.purpose && (
+              <Typography variant="caption" color="text.secondary" display="block">Purpose: {entry.purpose}</Typography>
+            )}
+          </Box>
+        );
       default:
         return 'Unknown';
     }
