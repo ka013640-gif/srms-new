@@ -285,27 +285,40 @@ const Residents = () => {
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             />
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <TextField
-                  label="Birthday"
-                  type="date"
-                  fullWidth
-                  value={formData.birthday}
-                  onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  label="Age"
-                  type="number"
-                  fullWidth
-                  value={formData.age}
-                  InputProps={{ readOnly: true }}
-                />
-              </Grid>
-            </Grid>
+<Grid container spacing={2}>
+               <Grid item xs={6}>
+                 <TextField
+                   label="Birthday"
+                   type="date"
+                   fullWidth
+                   value={formData.birthday}
+                   onChange={(e) => {
+                     const birthday = e.target.value;
+                     let age = 0;
+                     if (birthday) {
+                       const today = new Date();
+                       const birthDate = new Date(birthday);
+                       age = today.getFullYear() - birthDate.getFullYear();
+                       const monthDiff = today.getMonth() - birthDate.getMonth();
+                       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                         age--;
+                       }
+                     }
+                     setFormData({ ...formData, birthday, age });
+                   }}
+                   InputLabelProps={{ shrink: true }}
+                 />
+               </Grid>
+               <Grid item xs={6}>
+                 <TextField
+                   label="Age"
+                   type="number"
+                   fullWidth
+                   value={formData.age}
+                   InputProps={{ readOnly: true }}
+                 />
+               </Grid>
+             </Grid>
             <FormControl fullWidth>
               <InputLabel>Gender</InputLabel>
               <Select
