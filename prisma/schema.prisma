@@ -8,14 +8,14 @@ datasource db {
 }
 
 model User {
-  user_id        Int           @id @default(autoincrement())
-  username       String        @unique
+  user_id        Int               @id @default(autoincrement())
+  username       String            @unique
   password       String
   fullName       String
-  role           Role          @default(RESIDENT)
+  role           Role              @default(RESIDENT)
   email          String?
   profilePicture String?
-  created_at     DateTime      @default(now())
+  created_at     DateTime          @default(now())
   activityLog    ActivityLog[]
   resident       Resident?
   documents      DocumentRequest[]
@@ -52,6 +52,7 @@ model Official {
   term_end    DateTime?
   is_active   Boolean   @default(true)
   created_at  DateTime  @default(now())
+  deleted_at  DateTime?
 
   @@map("officials")
 }

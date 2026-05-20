@@ -83,6 +83,7 @@ const Archives = () => {
       case 'RESIDENT': return { label: 'Resident', color: 'primary' };
       case 'PROJECT': return { label: 'Project', color: 'secondary' };
       case 'SESSION': return { label: 'Session', color: 'success' };
+      case 'OFFICIAL': return { label: 'Official', color: 'warning' };
       default: return { label: type, color: 'default' };
     }
   };
@@ -95,6 +96,8 @@ const Archives = () => {
         return entry.name;
       case 'SESSION':
         return entry.title;
+      case 'OFFICIAL':
+        return entry.name;
       default:
         return 'Unknown';
     }
@@ -125,35 +128,44 @@ const Archives = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {archives.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
-                  No archived entries
-                </TableCell>
-              </TableRow>
-            ) : (
-              archives.map((entry) => (
-                <TableRow key={`${entry.entity_type}-${entry.entity_type === 'RESIDENT' ? entry.resident_id : entry.entity_type === 'PROJECT' ? entry.project_id : entry.session_id}`} hover>
-                  <TableCell>
-                    <Chip
-                      label={getEntityTypeLabel(entry.entity_type).label}
-                      color={getEntityTypeLabel(entry.entity_type).color}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>{renderEntityDetails(entry)}</TableCell>
-                  <TableCell>{new Date(entry.deleted_at).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <IconButton size="small" onClick={() => handleRestore(entry.entity_type === 'RESIDENT' ? entry.resident_id : entry.entity_type === 'PROJECT' ? entry.project_id : entry.session_id, entry.entity_type)} color="primary">
-                      <Restore fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" onClick={() => handlePermanentDelete(entry.entity_type === 'RESIDENT' ? entry.resident_id : entry.entity_type === 'PROJECT' ? entry.project_id : entry.session_id)} color="error">
-                      <DeleteForever fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+{archives.length === 0 ? (
+               <TableRow>
+                 <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
+                   No archived entries
+                 </TableCell>
+               </TableRow>
+             ) : (
+               archives.map((entry) => {
+                 const entryId = entry.entity_type === 'RESIDENT' 
+                   ? entry.resident_id 
+                   : entry.entity_type === 'PROJECT' 
+                     ? entry.project_id 
+                     : entry.entity_type === 'SESSION' 
+                       ? entry.session_id 
+                       : entry.official_id;
+                 return (
+                   <TableRow key={`${entry.entity_type}-${entryId}`} hover>
+                     <TableCell>
+                       <Chip
+                         label={getEntityTypeLabel(entry.entity_type).label}
+                         color={getEntityTypeLabel(entry.entity_type).color}
+                         size="small"
+                       />
+                     </TableCell>
+                     <TableCell>{renderEntityDetails(entry)}</TableCell>
+                     <TableCell>{new Date(entry.deleted_at).toLocaleString()}</TableCell>
+                     <TableCell>
+                       <IconButton size="small" onClick={() => handleRestore(entryId, entry.entity_type)} color="primary">
+                         <Restore fontSize="small" />
+                       </IconButton>
+                       <IconButton size="small" onClick={() => handlePermanentDelete(entryId)} color="error">
+                         <DeleteForever fontSize="small" />
+                       </IconButton>
+                     </TableCell>
+                   </TableRow>
+                 );
+               })
+             )}
           </TableBody>
         </Table>
       </TableContainer>
