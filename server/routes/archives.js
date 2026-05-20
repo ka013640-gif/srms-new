@@ -4,50 +4,125 @@ import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// GET /api/archives
+// GET /api/archives - Get all archived entries (Admin only)
 router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const archives = await prisma.archive.findMany({
-      orderBy: { created_at: 'desc' }
-    });
+    const [residents, projects, sessions] = await Promise.all([
+      prisma.resident.findMany({
+        where: { deleted_at: { not: null } },
+        orderBy: { deleted_at: 'desc' }
+      }),
+      prisma.project.findMany({
+        where: { deleted_at: { not: null } },
+        orderBy: { deleted_at: 'desc' }
+      }),
+      prisma.session.findMany({
+        where: { deleted_at: { not: null } },
+        orderBy: { deleted_at: 'desc' }
+      })
+    ]);
+
+    const archives = [
+      ...residents.map(r => ({ ...r, entity_type: 'RESIDENT' })),
+      ...projects.map(p => ({ ...p, entity_type: 'PROJECT' })),
+      ...sessions.map(s => ({ ...s, entity_type: 'SESSION' }))
+    ].sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
 
     res.json({ archives });
   } catch (error) {
+    console.error('Failed to fetch archives:', error);
     res.status(500).json({ error: 'Failed to fetch archives' });
   }
 });
 
-// POST /api/archives (Admin only)
-router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
+// POST /api/archives/:id/restore - Restore entry from archive (Admin only)
+router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const { title, description, category, file_path } = req.body;
-
-    const archive = await prisma.archive.create({
-      data: {
-        title,
-        description,
-        category,
-        file_path,
-        uploaded_by: req.user.id
-      }
+    const { id } = req.params;
+    
+    // Find which table has this ID
+    const resident = await prisma.resident.findFirst({ 
+      where: { resident_id: parseInt(id), deleted_at: { not: null } } 
+    });
+    const project = await prisma.project.findFirst({ 
+      where: { project_id: parseInt(id), deleted_at: { not: null } } 
+    });
+    const session = await prisma.session.findFirst({ 
+      where: { session_id: parseInt(id), deleted_at: { not: null } } 
     });
 
-    res.status(201).json({ message: 'Archive created', archive });
+    if (resident) {
+      await prisma.resident.update({
+        where: { resident_id: parseInt(id) },
+        data: { deleted_at: null }
+      });
+      return res.json({ message: 'Resident restored successfully' });
+    }
+    
+    if (project) {
+      await prisma.project.update({
+        where: { project_id: parseInt(id) },
+        data: { deleted_at: null }
+      });
+      return res.json({ message: 'Project restored successfully' });
+    }
+    
+    if (session) {
+      await prisma.session.update({
+        where: { session_id: parseInt(id) },
+        data: { deleted_at: null }
+      });
+      return res.json({ message: 'Session restored successfully' });
+    }
+
+    return res.status(404).json({ error: 'Archive entry not found' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create archive' });
+    console.error('Failed to restore entry:', error);
+    res.status(500).json({ error: 'Failed to restore entry' });
   }
 });
 
-// DELETE /api/archives/:id (Admin only)
-router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
+// DELETE /api/archives/:id/permanent - Permanently delete from archive (Admin only)
+router.delete('/:id/permanent', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    await prisma.archive.delete({
-      where: { archive_id: parseInt(req.params.id) }
+    const { id } = req.params;
+    
+    // Find which table has this ID
+    const resident = await prisma.resident.findFirst({ 
+      where: { resident_id: parseInt(id), deleted_at: { not: null } } 
+    });
+    const project = await prisma.project.findFirst({ 
+      where: { project_id: parseInt(id), deleted_at: { not: null } } 
+    });
+    const session = await prisma.session.findFirst({ 
+      where: { session_id: parseInt(id), deleted_at: { not: null } } 
     });
 
-    res.json({ message: 'Archive deleted' });
+    if (resident) {
+      await prisma.resident.delete({
+        where: { resident_id: parseInt(id) }
+      });
+      return res.json({ message: 'Resident permanently deleted' });
+    }
+    
+    if (project) {
+      await prisma.project.delete({
+        where: { project_id: parseInt(id) }
+      });
+      return res.json({ message: 'Project permanently deleted' });
+    }
+    
+    if (session) {
+      await prisma.session.delete({
+        where: { session_id: parseInt(id) }
+      });
+      return res.json({ message: 'Session permanently deleted' });
+    }
+
+    return res.status(404).json({ error: 'Archive entry not found' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete archive' });
+    console.error('Failed to permanently delete entry:', error);
+    res.status(500).json({ error: 'Failed to permanently delete entry' });
   }
 });
 

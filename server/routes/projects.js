@@ -9,7 +9,8 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
+      where: { deleted_at: null }
     });
 
     res.json({ projects });
@@ -22,7 +23,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:project_id', authenticate, async (req, res) => {
   try {
     const project = await prisma.project.findUnique({
-      where: { project_id: parseInt(req.params.project_id) }
+      where: { project_id: parseInt(req.params.project_id), deleted_at: null }
     });
 
     if (!project) {
@@ -63,14 +64,23 @@ router.put('/:project_id', authenticate, authorize('ADMIN'), validate(projectVal
   }
 });
 
-// DELETE /api/projects/:project_id (Admin only)
+// DELETE /api/projects/:project_id (Admin only) - soft delete to archive
 router.delete('/:project_id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    await prisma.project.delete({
+    const project = await prisma.project.findUnique({
       where: { project_id: parseInt(req.params.project_id) }
     });
 
-    res.json({ message: 'Project deleted' });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    await prisma.project.update({
+      where: { project_id: parseInt(req.params.project_id) },
+      data: { deleted_at: new Date() }
+    });
+
+    res.json({ message: 'Project moved to archives' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete project' });
   }

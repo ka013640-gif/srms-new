@@ -8,8 +8,8 @@ const router = express.Router();
 // GET /api/residents/stats (active count only - public endpoint)
 router.get('/stats', async (req, res) => {
   try {
-    const active = await prisma.resident.count({ 
-      where: { status: 'Active' } 
+    const active = await prisma.resident.count({
+      where: { status: 'Active', deleted_at: null }
     });
     res.json({ active });
   } catch (error) {
@@ -21,9 +21,9 @@ router.get('/stats', async (req, res) => {
 // GET /api/residents/stats/all (dashboard stats - admin only)
 router.get('/stats/all', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const total = await prisma.resident.count();
-    const active = await prisma.resident.count({ 
-      where: { status: 'Active' } 
+    const total = await prisma.resident.count({ where: { deleted_at: null } });
+    const active = await prisma.resident.count({
+      where: { status: 'Active', deleted_at: null }
     });
 
     res.json({ total, active });
@@ -50,9 +50,10 @@ router.get('/', authenticate, async (req, res) => {
         skip: parseInt(offset),
         take: parseInt(limit),
         orderBy,
+        where: { deleted_at: null },
         include: { user: { select: { username: true } } }
       }),
-      prisma.resident.count()
+      prisma.resident.count({ where: { deleted_at: null } })
     ]);
 
     res.json({
@@ -74,7 +75,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const resident = await prisma.resident.findUnique({
-      where: { resident_id: parseInt(req.params.id) }
+      where: { resident_id: parseInt(req.params.id), deleted_at: null }
     });
 
     if (!resident) {
@@ -160,14 +161,23 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/residents/:id - Admin only
+// DELETE /api/residents/:id - Admin only (soft delete to archive)
 router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    await prisma.resident.delete({
+    const resident = await prisma.resident.findUnique({
       where: { resident_id: parseInt(req.params.id) }
     });
 
-    res.json({ message: 'Resident deleted' });
+    if (!resident) {
+      return res.status(404).json({ error: 'Resident not found' });
+    }
+
+    await prisma.resident.update({
+      where: { resident_id: parseInt(req.params.id) },
+      data: { deleted_at: new Date() }
+    });
+
+    res.json({ message: 'Resident moved to archives' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete resident' });
   }
