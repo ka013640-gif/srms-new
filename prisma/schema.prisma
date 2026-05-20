@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id        Int           @id @default(autoincrement())
+  username       String        @unique
+  password       String
+  fullName       String
+  role           Role          @default(RESIDENT)
+  email          String?
+  profilePicture String?
+  created_at     DateTime      @default(now())
+  activityLog    ActivityLog[]
+  resident       Resident?
+  documents      DocumentRequest[]
+
+  @@map("users")
+}
+
+model Resident {
+  resident_id  Int           @id @default(autoincrement())
+  user_id      Int?          @unique
+  full_name    String
+  age          Int
+  gender       String
+  birthday     DateTime?
+  address      String
+  contact      String?
+  occupation   String?
+  civil_status String
+  status       String        @default("Active")
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+  user         User?         @relation(fields: [user_id], references: [user_id])
+
+  @@map("residents")
+}
+
+model Official {
+  official_id Int      @id @default(autoincrement())
+  name        String
+  position    String
+  contact     String?
+  term_start  DateTime @default(now())
+  term_end    DateTime?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  @@map("officials")
+}
+
+model Project {
+  project_id  Int           @id @default(autoincrement())
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  budget      Float?
+  start_date  DateTime?
+  end_date    DateTime?
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+
+  @@map("projects")
+}
+
+model Session {
+  session_id  Int         @id @default(autoincrement())
+  title       String
+  description String?
+  date        DateTime
+  time        String
+  location    String
+  attendees   String?
+  status      SessionStatus @default(SCHEDULED)
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+
+  @@map("sessions")
+}
+
+model DocumentRequest {
+  document_request_id Int           @id @default(autoincrement())
+  user_id             Int
+  type                String
+  purpose             String
+  request_date        DateTime      @default(now())
+  status              RequestStatus @default(PENDING)
+  processed_by        Int?
+  processed_at        DateTime?
+  notes               String?
+  created_at          DateTime      @default(now())
+  file_path           String?
+  response_file       String?
+  response_comment    String?
+  user                User          @relation(fields: [user_id], references: [user_id])
+  attachments         DocumentRequestAttachment[]
+
+  @@index([user_id], map: "document_requests_user_id_fkey")
+  @@map("document_requests")
+}
+
+model DocumentRequestAttachment {
+  document_request_attachment_id Int                @id @default(autoincrement()) @map("id")
+  document_request_id            Int
+  file_path                      String
+  file_name                      String
+  is_admin                       Boolean            @default(false)
+  is_deleted                     Boolean            @default(false)
+  created_at                     DateTime           @default(now())
+  document_request               DocumentRequest    @relation(fields: [document_request_id], references: [document_request_id], onDelete: Cascade)
+
+  @@index([document_request_id], map: "document_request_attachments_request_id_fkey")
+  @@map("document_request_attachments")
+}
+
+model ActivityLog {
+  activity_log_id Int      @id @default(autoincrement())
+  user_id         Int
+  action          String
+  details         String?
+  ip_address      String?
+  created_at      DateTime @default(now())
+  user            User     @relation(fields: [user_id], references: [user_id])
+
+  @@index([user_id], map: "activity_log_user_id_fkey")
+  @@map("activity_log")
+}
+
+model Archive {
+  archive_id   Int      @id @default(autoincrement())
+  title        String
+  description  String?
+  category     String
+  file_path    String
+  uploaded_by  Int
+  created_at   DateTime @default(now())
+
+  @@map("archives")
+}
+
+enum Role {
+  ADMIN
+  RESIDENT
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RELEASED
+  CANCELLED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
