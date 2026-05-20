@@ -84,6 +84,7 @@ const Archives = () => {
       case 'PROJECT': return { label: 'Project', color: 'secondary' };
       case 'SESSION': return { label: 'Session', color: 'success' };
       case 'OFFICIAL': return { label: 'Official', color: 'warning' };
+      case 'DOCUMENT_REQUEST': return { label: 'Document Request', color: 'info' };
       default: return { label: type, color: 'default' };
     }
   };
@@ -98,6 +99,8 @@ const Archives = () => {
         return entry.title;
       case 'OFFICIAL':
         return entry.name;
+      case 'DOCUMENT_REQUEST':
+        return entry.type;
       default:
         return 'Unknown';
     }
@@ -135,15 +138,17 @@ const Archives = () => {
                  </TableCell>
                </TableRow>
              ) : (
-               archives.map((entry) => {
-                 const entryId = entry.entity_type === 'RESIDENT' 
-                   ? entry.resident_id 
-                   : entry.entity_type === 'PROJECT' 
-                     ? entry.project_id 
-                     : entry.entity_type === 'SESSION' 
-                       ? entry.session_id 
-                       : entry.official_id;
-                 return (
+archives.map((entry) => {
+                  const entryId = entry.entity_type === 'RESIDENT' 
+                    ? entry.resident_id 
+                    : entry.entity_type === 'PROJECT' 
+                      ? entry.project_id 
+                      : entry.entity_type === 'SESSION' 
+                        ? entry.session_id 
+                        : entry.entity_type === 'OFFICIAL'
+                          ? entry.official_id
+                          : entry.document_request_id;
+                  return (
                    <TableRow key={`${entry.entity_type}-${entryId}`} hover>
                      <TableCell>
                        <Chip

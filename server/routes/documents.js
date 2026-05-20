@@ -32,7 +32,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, user_id, resident_id } = req.query;
 
-    let where = {};
+    let where = { deleted_at: null };
     if (status) where.status = status;
 
     // Accept both new user_id and backward-compat resident_id query params
@@ -76,7 +76,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const request = await prisma.documentRequest.findUnique({
-      where: { document_request_id: parseInt(req.params.id) },
+      where: { document_request_id: parseInt(req.params.id), deleted_at: null },
       include: {
         user: { select: { fullName: true, username: true } },
         attachments: {
@@ -376,62 +376,29 @@ router.delete('/:id/response-file', authenticate, authorize('ADMIN'), async (req
 });
 
 // ============================================================
-// DELETE /api/documents/:id (Owner deletes own request + files)
+// DELETE /api/documents/:id (Admin only - soft delete to archive)
 // ============================================================
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const requestId = parseInt(req.params.id);
 
     const request = await prisma.documentRequest.findUnique({
-      where: { document_request_id: requestId },
-      include: { attachments: true }
+      where: { document_request_id: requestId }
     });
 
     if (!request) {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    // Only the request owner can delete
-    if (req.user.role !== 'ADMIN') {
-      if (request.user_id !== req.user.id) {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-    }
-
-    // Delete attachment files from disk
-    for (const attach of request.files) {
-      const fileOnDisk = path.join(
-        process.cwd(),
-        attach.file_path.replace(/^\//, '')
-      );
-      if (fs.existsSync(fileOnDisk)) {
-        fs.unlinkSync(fileOnDisk);
-      }
-    }
-
-    // Delete response file from disk
-    if (request.response_file) {
-      const respFileOnDisk = path.join(
-        process.cwd(),
-        request.response_file.replace(/^\//, '')
-      );
-      if (fs.existsSync(respFileOnDisk)) {
-        fs.unlinkSync(respFileOnDisk);
-      }
-    }
-
-    // Delete attachment records and the request itself
-    await prisma.documentRequestAttachment.deleteMany({
-      where: { document_request_id: requestId }
-    });
-    await prisma.documentRequest.delete({
-      where: { document_request_id: requestId }
+    await prisma.documentRequest.update({
+      where: { document_request_id: requestId },
+      data: { deleted_at: new Date() }
     });
 
-    res.json({ message: 'Request deleted successfully' });
+    res.json({ message: 'Request moved to archives' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to delete request' });
+    res.status(500).json({ error: 'Failed to archive request' });
   }
 });
 

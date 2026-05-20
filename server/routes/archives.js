@@ -7,7 +7,7 @@ const router = express.Router();
 // GET /api/archives - Get all archived entries (Admin only)
 router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const [residents, projects, sessions, officials] = await Promise.all([
+    const [residents, projects, sessions, officials, documentRequests] = await Promise.all([
       prisma.resident.findMany({
         where: { deleted_at: { not: null } },
         orderBy: { deleted_at: 'desc' }
@@ -23,6 +23,11 @@ router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
       prisma.official.findMany({
         where: { deleted_at: { not: null } },
         orderBy: { deleted_at: 'desc' }
+      }),
+      prisma.documentRequest.findMany({
+        where: { deleted_at: { not: null } },
+        orderBy: { deleted_at: 'desc' },
+        include: { user: { select: { fullName: true } } }
       })
     ]);
 
@@ -30,7 +35,8 @@ router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
       ...residents.map(r => ({ ...r, entity_type: 'RESIDENT' })),
       ...projects.map(p => ({ ...p, entity_type: 'PROJECT' })),
       ...sessions.map(s => ({ ...s, entity_type: 'SESSION' })),
-      ...officials.map(o => ({ ...o, entity_type: 'OFFICIAL' }))
+      ...officials.map(o => ({ ...o, entity_type: 'OFFICIAL' })),
+      ...documentRequests.map(d => ({ ...d, entity_type: 'DOCUMENT_REQUEST' }))
     ].sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
 
     res.json({ archives });
@@ -57,6 +63,9 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
     });
     const official = await prisma.official.findFirst({ 
       where: { official_id: parseInt(id), deleted_at: { not: null } } 
+    });
+    const documentRequest = await prisma.documentRequest.findFirst({ 
+      where: { document_request_id: parseInt(id), deleted_at: { not: null } } 
     });
 
     if (resident) {
@@ -91,6 +100,14 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
       return res.json({ message: 'Official restored successfully' });
     }
 
+    if (documentRequest) {
+      await prisma.documentRequest.update({
+        where: { document_request_id: parseInt(id) },
+        data: { deleted_at: null }
+      });
+      return res.json({ message: 'Document request restored successfully' });
+    }
+
     return res.status(404).json({ error: 'Archive entry not found' });
   } catch (error) {
     console.error('Failed to restore entry:', error);
@@ -115,6 +132,9 @@ router.delete('/:id/permanent', authenticate, authorize('ADMIN'), async (req, re
     });
     const official = await prisma.official.findFirst({ 
       where: { official_id: parseInt(id), deleted_at: { not: null } } 
+    });
+    const documentRequest = await prisma.documentRequest.findFirst({ 
+      where: { document_request_id: parseInt(id), deleted_at: { not: null } } 
     });
 
     if (resident) {
@@ -143,6 +163,16 @@ router.delete('/:id/permanent', authenticate, authorize('ADMIN'), async (req, re
         where: { official_id: parseInt(id) }
       });
       return res.json({ message: 'Official permanently deleted' });
+    }
+
+    if (documentRequest) {
+      await prisma.documentRequestAttachment.deleteMany({
+        where: { document_request_id: parseInt(id) }
+      });
+      await prisma.documentRequest.delete({
+        where: { document_request_id: parseInt(id) }
+      });
+      return res.json({ message: 'Document request permanently deleted' });
     }
 
     return res.status(404).json({ error: 'Archive entry not found' });

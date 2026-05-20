@@ -102,6 +102,7 @@ model DocumentRequest {
   file_path           String?
   response_file       String?
   response_comment    String?
+  deleted_at          DateTime?
   attachments         DocumentRequestAttachment[]
   user                User                        @relation(fields: [user_id], references: [user_id])
 

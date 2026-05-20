@@ -9,7 +9,7 @@ import {
 import {
   Add, Close, ExpandMore, ExpandLess, Description,
   Download, FileUpload, CheckCircle, Cancel as CancelIcon,
-  Send as SendIcon
+  Send as SendIcon, Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -54,6 +54,17 @@ const Documents = () => {
     catch (e) { alert('error', e.response?.data?.error || 'Failed to remove attachment'); }
     await fetchRequests();
   };
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to archive this document request?')) {
+      try {
+        await api.delete(`documents/${id}`);
+        fetchRequests();
+        alert('success','Request archived.');
+      } catch (e) {
+        alert('error', e.response?.data?.error || 'Failed to archive request');
+      }
+    }
+  };
   const handleRejectOpen = (req) => { setRejectTarget(req); setRejectNote(''); setRejectOpen(true); };
   const handleRejectSubmit = async () => { if (!rejectTarget) return; await handleStatusUpdate(rejectTarget.document_request_id,'REJECTED',rejectNote); setRejectOpen(false); setRejectTarget(null); setRejectNote(''); };
 
@@ -89,11 +100,28 @@ const Documents = () => {
             Respond & Approve
           </Button>
           <Button size="small" variant="outlined" onClick={() => handleRejectOpen(req)} color="error">Reject</Button>
+          <IconButton size="small" onClick={() => handleDelete(req.document_request_id)} color="error" title="Archive request" sx={{ml:0.5}}>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
         </>
       );
     }
     if (req.status === 'APPROVED') {
-      return <Button size="small" variant="outlined" onClick={() => handleStatusUpdate(req.document_request_id,'RELEASED')} sx={{ color:'#0369a1', borderColor:'#0369a1' }}>Mark Released</Button>;
+      return (
+        <>
+          <Button size="small" variant="outlined" onClick={() => handleStatusUpdate(req.document_request_id,'RELEASED')} sx={{ color:'#0369a1', borderColor:'#0369a1', mr:0.5 }}>Mark Released</Button>
+          <IconButton size="small" onClick={() => handleDelete(req.document_request_id)} color="error" title="Archive request">
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </>
+      );
+    }
+    if (req.status === 'RELEASED' || req.status === 'REJECTED') {
+      return (
+        <IconButton size="small" onClick={() => handleDelete(req.document_request_id)} color="error" title="Archive request">
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      );
     }
     return <Typography variant="body2" color="#64748b">{req.status}</Typography>;
   };
