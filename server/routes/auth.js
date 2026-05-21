@@ -228,11 +228,12 @@ router.post('/create-account', authenticate, authorize('ADMIN'), validate(create
         });
       }
 
-      await logActivity(user.user_id, 'CREATE_ACCOUNT',
-        { full_name: residentData.full_name, accountType }, req);
-
       return { user, resident: residentData, official };
     });
+
+    // Log activity after transaction completes successfully
+    await logActivity(result.user.user_id, 'CREATE_ACCOUNT',
+      { full_name: result.resident.full_name, accountType }, req);
 
     res.status(201).json({
       message: accountType === 'official' ? 'Official account created successfully' : 'Account created successfully',
