@@ -25,7 +25,7 @@ export const loginValidation = [
 export const registerValidation = [
   body('fullname').notEmpty().withMessage('Full name is required'),
   body('username').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
 ];
 
 export const residentValidation = [
@@ -44,9 +44,9 @@ export const projectValidation = [
 
 export const createAccountValidation = [
   body('username').trim().isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('fullname').notEmpty().withMessage('Full name is required'),
-  body('email').isEmail().withMessage('Email is required'),
+  body('email').optional({ checkFalsy: true }).isEmail().withMessage('Invalid email format'),
   body('birthday').isISO8601().withMessage('Birthday is required'),
   body('gender').isIn(['Male', 'Female', 'Other']).withMessage('Gender must be Male, Female, or Other'),
   body('address').notEmpty().withMessage('Address is required'),
@@ -54,7 +54,7 @@ export const createAccountValidation = [
   body('accountType').isIn(['resident', 'official']).withMessage('Account type must be resident or official'),
   body('contact').optional().isString(),
   body('occupation').optional().isString(),
-  body('position').if(body('accountType').equals('official')).notEmpty().withMessage('Position is required for officials'),
-  body('term_start').if(body('accountType').equals('official')).optional().isISO8601(),
-  body('term_end').if(body('accountType').equals('official')).optional().isISO8601()
+  body('position').if((value, { req }) => req.body.accountType === 'official').notEmpty().withMessage('Position is required for officials'),
+  body('term_start').if((value, { req }) => req.body.accountType === 'official').optional().isISO8601(),
+  body('term_end').if((value, { req }) => req.body.accountType === 'official').optional().isISO8601()
 ];

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import prisma from '../prisma.js';
 import { validate, loginValidation, registerValidation, createAccountValidation } from '../middleware/validate.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 import { logActivity } from './activity.js';
 
 const router = express.Router();
@@ -126,7 +126,7 @@ router.post('/login', validate(loginValidation), async (req, res) => {
 });
 
 // POST /api/auth/create-account — creates User + Resident (+ Official) atomically
-router.post('/create-account', validate(createAccountValidation), async (req, res) => {
+router.post('/create-account', authenticate, authorize('ADMIN'), validate(createAccountValidation), async (req, res) => {
   try {
     const { accountType } = req.body;
     const { username, password, fullname, email, position, term_start, term_end } = req.body;
@@ -150,13 +150,13 @@ router.post('/create-account', validate(createAccountValidation), async (req, re
     const now = new Date();
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create user account (always RESIDENT role)
+      // 1. Create user account (RESIDENT or OFFICIAL role based on accountType)
       const user = await tx.user.create({
         data: {
           username: username.trim(),
           password: hashedPassword,
           fullName: fullname.trim(),
-          role: 'RESIDENT',
+          role: accountType === 'official' ? 'OFFICIAL' : 'RESIDENT',
           email: email?.trim() || null
         },
         select: {
@@ -172,68 +172,37 @@ router.post('/create-account', validate(createAccountValidation), async (req, re
       // 2. Create resident profile linked to the new user
       const isBirthdayDate = (d) => !isNaN(Date.parse(d));
 
-      let residentData;
-      if (accountType === 'official' && isBirthdayDate(req.body.birthday)) {
-        residentData = await tx.resident.create({
-          data: {
-            user_id: user.user_id,
-            full_name: fullname.trim(),
-            age: age,
-            gender: req.body.gender,
-            birthday: isBirthdayDate(req.body.birthday) ? new Date(req.body.birthday) : null,
-            address: req.body.address.trim(),
-            contact: req.body.contact?.trim() || null,
-            occupation: 'Barangay Official',
-            civil_status: req.body.civil_status,
-            status: 'Active'
-          },
-          select: {
-            resident_id: true,
-            full_name: true,
-            birthday: true,
-            age: true,
-            gender: true,
-            address: true,
-            contact: true,
-            occupation: true,
-            civil_status: true,
-            status: true,
-            created_at: true
-          }
-        });
-      } else {
-        residentData = await tx.resident.create({
-          data: {
-            user_id: user.user_id,
-            full_name: fullname.trim(),
-            age: age,
-            gender: req.body.gender,
-            birthday: isBirthdayDate(req.body.birthday) ? new Date(req.body.birthday) : null,
-            address: req.body.address.trim(),
-            contact: req.body.contact?.trim() || null,
-            occupation: req.body.occupation?.trim() || null,
-            civil_status: req.body.civil_status,
-            status: 'Active'
-          },
-          select: {
-            resident_id: true,
-            full_name: true,
-            birthday: true,
-            age: true,
-            gender: true,
-            address: true,
-            contact: true,
-            occupation: true,
-            civil_status: true,
-            status: true,
-            created_at: true
-          }
-        });
-      }
+      const residentData = await tx.resident.create({
+        data: {
+          user_id: user.user_id,
+          full_name: fullname.trim(),
+          age: age,
+          gender: req.body.gender,
+          birthday: isBirthdayDate(req.body.birthday) ? new Date(req.body.birthday) : null,
+          address: req.body.address.trim(),
+          contact: req.body.contact?.trim() || null,
+          occupation: accountType === 'official' ? 'Barangay Official' : (req.body.occupation?.trim() || null),
+          civil_status: req.body.civil_status,
+          status: 'Active'
+        },
+        select: {
+          resident_id: true,
+          full_name: true,
+          birthday: true,
+          age: true,
+          gender: true,
+          address: true,
+          contact: true,
+          occupation: true,
+          civil_status: true,
+          status: true,
+          created_at: true
+        }
+      });
 
       // 3. Optionally create official record
       let official = null;
-      if (accountType === 'official') {
+      if (accountType === 'official' && position && position.trim()) {
         const startDate = isBirthdayDate(term_start) ? new Date(term_start) : now;
         const endDate = isBirthdayDate(term_end) ? new Date(term_end) : null;
 
