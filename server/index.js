@@ -14,6 +14,7 @@ import sessionRoutes from './routes/sessions.js';
 import documentRoutes from './routes/documents.js';
 import archiveRoutes from './routes/archives.js';
 import activityRoutes from './routes/activity.js';
+import announcementRoutes from './routes/announcements.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/archives', archiveRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Error handling
 app.use(errorHandler);

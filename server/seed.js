@@ -1,75 +1,82 @@
-import { PrismaClient } from '@prisma/client';
+import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: '',
+  database: 'srms'
+});
 
-async function main() {
-  const adminPw = await bcrypt.hash('admin123', 10);
-  const residentPw = await bcrypt.hash('12345678', 10);
+const conn = await pool.getConnection();
+try {
+  // Check users
+  const [usersCount] = await conn.query('SELECT COUNT(*) as cnt FROM users');
+  console.log(`Users: ${usersCount[0].cnt} rows`);
+  if (usersCount[0].cnt > 0) {
+    const [users] = await conn.query('SELECT user_id, username, role FROM users');
+    console.log(JSON.stringify(users, null, 2));
+  } else {
+    console.log('No users — inserting seed data...');
 
-  await prisma.user.upsert({
-    where: { username: 'admin' },
-    update: { fullName: 'System Administrator' },
-    create: { fullName: 'System Administrator', username: 'admin', password: adminPw, role: 'ADMIN' }
-  });
-  console.log('Admin user: admin / admin123');
+    const hashedAdmin = await bcrypt.hash('admin123', 10);
+    const hashedResident = await bcrypt.hash('resident123', 10);
 
-  await prisma.user.upsert({
-    where: { username: 'resident' },
-    update: {},
-    create: { fullName: 'Default Resident', username: 'resident', password: residentPw, role: 'RESIDENT' }
-  });
-  console.log('Resident user: resident / 12345678');
+    await conn.query(`
+      INSERT INTO users (username, password, fullName, role, email)
+      VALUES
+        ('admin',    ?, 'System Administrator', 'ADMIN',    'admin@barangay.gov.ph'),
+        ('resident', ?, 'Juan Dela Cruz',       'RESIDENT', NULL),
+        ('official', ?, 'Maria Santos',          'OFFICIAL', NULL)
+    `, [hashedAdmin, hashedResident, hashedResident]);
 
-  const residents = [];
-
-  const born2000 = [
-    { id: '001', age: 26, gender: 'Male', status: 'Inactive' },
-    { id: '002', age: 26, gender: 'Male', status: 'Active' },
-    { id: '003', age: 26, gender: 'Male', status: 'Active' },
-    { id: '004', age: 26, gender: 'Male', status: 'Active' },
-    { id: '005', age: 26, gender: 'Male', status: 'Active' },
-    { id: '006', age: 26, gender: 'Male', status: 'Active' },
-    { id: '007', age: 26, gender: 'Male', status: 'Active' },
-    { id: '008', age: 26, gender: 'Female', status: 'Inactive' },
-    { id: '009', age: 26, gender: 'Female', status: 'Active' },
-    { id: '010', age: 26, gender: 'Female', status: 'Active' },
-    { id: '011', age: 26, gender: 'Female', status: 'Active' },
-    { id: '012', age: 26, gender: 'Female', status: 'Active' },
-  ];
-
-  const born1960 = [
-    { id: '013', age: 66, gender: 'Male', status: 'Active' },
-    { id: '014', age: 66, gender: 'Male', status: 'Active' },
-    { id: '015', age: 66, gender: 'Male', status: 'Active' },
-    { id: '016', age: 66, gender: 'Male', status: 'Active' },
-    { id: '017', age: 66, gender: 'Female', status: 'Active' },
-    { id: '018', age: 66, gender: 'Female', status: 'Active' },
-  ];
-
-  const born2010 = [
-    { id: '019', age: 16, gender: 'Male', status: 'Active' },
-    { id: '020', age: 16, gender: 'Female', status: 'Active' },
-  ];
-
-  for (const r of [...born2000, ...born1960, ...born2010]) {
-    const birthday = r.age === 26 ? new Date('2000-01-01') : r.age === 66 ? new Date('1960-01-01') : new Date('2010-01-01');
-    residents.push({ full_name: r.id, age: r.age, gender: r.gender, address: 'Calabanga, Camarines Sur', birthday, civil_status: '', occupation: '', status: r.status });
+    console.log('Users seeded.');
   }
 
-  await prisma.resident.deleteMany({});
-  
-  for (const r of residents) {
-    await prisma.resident.create({
-      data: r
-    });
+  // Insert resident profile for user_id=2 (resident account)
+  const [residentsCount] = await conn.query('SELECT COUNT(*) as cnt FROM residents');
+  if (residentsCount[0].cnt === 0) {
+    await conn.query(`
+      INSERT INTO residents (user_id, full_name, age, gender, birthday, address, contact, occupation, civil_status, status)
+      VALUES (2, 'Juan Dela Cruz', 30, 'Male', '1995-05-15', '123 Main Street', '09123456789', 'Farmer', 'Single', 'Active')
+    `);
+    console.log('Resident profile seeded.');
   }
-  console.log('Created 20 sample residents');
 
-  console.log('Seed complete.');
+  // Insert official
+  const [officialsCount] = await conn.query('SELECT COUNT(*) as cnt FROM officials');
+  if (officialsCount[0].cnt === 0) {
+    await conn.query(`
+      INSERT INTO officials (name, position, contact, term_start, is_active)
+      VALUES ('Maria Santos', 'Barangay Secretary', '09129876543', '2024-07-01', true)
+    `);
+    console.log('Official seeded.');
+  }
+
+  // Insert a sample project if none exist
+  const [projectsCount] = await conn.query('SELECT COUNT(*) as cnt FROM projects');
+  if (projectsCount[0].cnt === 0) {
+    await conn.query(`
+      INSERT INTO projects (name, description, status, budget, start_date, end_date)
+      VALUES ('Road Repair', 'Repair main barangay road', 'ACTIVE', 50000, '2026-01-15', '2026-06-30')
+    `);
+    console.log('Project seeded.');
+  }
+
+  // Insert a session if none exist
+  const [sessionsCount] = await conn.query('SELECT COUNT(*) as cnt FROM sessions');
+  if (sessionsCount[0].cnt === 0) {
+    await conn.query(`
+      INSERT INTO sessions (title, description, date, time, location, status)
+      VALUES ('Monthly Assembly', 'Regular barangay assembly meeting', '2026-06-15', '09:00:00', 'Barangay Hall', 'SCHEDULED')
+    `);
+    console.log('Session seeded.');
+  }
+
+  // Final verification
+  const [final] = await conn.query('SELECT user_id, username, fullName, role FROM users');
+  console.log('\nAll users:', JSON.stringify(final, null, 2));
+} finally {
+  conn.release();
+  await pool.end();
 }
-
-main()
-  .catch(console.error)
-  .finally(async () => { await prisma.$disconnect(); });
-

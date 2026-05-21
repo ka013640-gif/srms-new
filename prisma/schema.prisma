@@ -17,8 +17,9 @@ model User {
   profilePicture String?
   created_at     DateTime          @default(now())
   activityLog    ActivityLog[]
-  resident       Resident?
+  announcements  Announcement[]
   documents      DocumentRequest[]
+  resident       Resident?
 
   @@map("users")
 }
@@ -80,9 +81,9 @@ model Session {
   time        String
   location    String
   attendees   String?
-  status      SessionStatus @default(SCHEDULED)
   created_at  DateTime      @default(now())
   updated_at  DateTime      @updatedAt
+  status      SessionStatus @default(SCHEDULED)
   deleted_at  DateTime?
 
   @@map("sessions")
@@ -135,6 +136,19 @@ model ActivityLog {
 
   @@index([user_id], map: "activity_log_user_id_fkey")
   @@map("activity_log")
+}
+
+model Announcement {
+  announcement_id Int      @id @default(autoincrement())
+  title           String
+  content         String?
+  user_id         Int
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  deleted_at      DateTime?
+  user            User     @relation(fields: [user_id], references: [user_id])
+
+  @@map("announcements")
 }
 
 enum Role {
