@@ -11,22 +11,36 @@ const Layout = () => {
     navigate('/login');
   };
 
-  const menuItems = [
-    { path: '/', icon: 'fa-home', label: 'Home', roles: ['ADMIN', 'RESIDENT'] },
-    { path: '/profile', icon: 'fa-user', label: 'My Profile', roles: ['ADMIN', 'RESIDENT'] },
-    { path: '/officials', icon: 'fa-users', label: 'Barangay Officials', roles: ['ADMIN', 'RESIDENT'] },
-    { path: '/documents', icon: 'fa-file-alt', label: 'Document Request', roles: ['ADMIN', 'RESIDENT'] },
-    { path: '/residents', icon: 'fa-user-friends', label: 'Residents', roles: ['ADMIN'] },
-    { path: '/demographics', icon: 'fa-chart-pie', label: 'Demographics', roles: ['ADMIN'] },
-    { path: '/projects', icon: 'fa-folder-open', label: 'Projects', roles: ['ADMIN'] },
-    { path: '/sessions', icon: 'fa-calendar-alt', label: 'Sessions', roles: ['ADMIN'] },
-    { path: '/archives', icon: 'fa-archive', label: 'Archives', roles: ['ADMIN'] },
-    { path: '/activity-log', icon: 'fa-chart-line', label: 'Activity Log', roles: ['ADMIN'] },
-  ];
+  const menuItemsByRole = {
+    RESIDENT: [
+      { path: '/', icon: 'fa-home', label: 'Home' },
+      { path: '/profile', icon: 'fa-user', label: 'My Profile' },
+      { path: '/documents', icon: 'fa-file-alt', label: 'Document Request' },
+    ],
+    OFFICIAL: [
+      { path: '/', icon: 'fa-home', label: 'Home' },
+      { path: '/profile', icon: 'fa-user', label: 'My Profile' },
+      { path: '/officials', icon: 'fa-users', label: 'Barangay Officials' },
+      { path: '/residents', icon: 'fa-user-friends', label: 'Residents' },
+      { path: '/demographics', icon: 'fa-chart-pie', label: 'Demographics' },
+      { path: '/projects', icon: 'fa-folder-open', label: 'Projects' },
+      { path: '/sessions', icon: 'fa-calendar-alt', label: 'Sessions' },
+    ],
+    ADMIN: [
+      { path: '/', icon: 'fa-home', label: 'Home' },
+      { path: '/profile', icon: 'fa-user', label: 'My Profile' },
+      { path: '/officials', icon: 'fa-users', label: 'Barangay Officials' },
+      { path: '/residents', icon: 'fa-user-friends', label: 'Residents' },
+      { path: '/demographics', icon: 'fa-chart-pie', label: 'Demographics' },
+      { path: '/projects', icon: 'fa-folder-open', label: 'Projects' },
+      { path: '/sessions', icon: 'fa-calendar-alt', label: 'Sessions' },
+      { path: '/archives', icon: 'fa-archive', label: 'Archives' },
+      { path: '/documents', icon: 'fa-file-alt', label: 'Document Request' },
+      { path: '/activity-log', icon: 'fa-chart-line', label: 'Activity Log' },
+    ],
+  };
 
-  const filteredMenu = menuItems.filter(item =>
-    item.roles.includes(user?.role)
-  );
+  const filteredMenu = menuItemsByRole[user?.role] || [];
 
   return (
     <Box sx={{ display: 'flex' }}>

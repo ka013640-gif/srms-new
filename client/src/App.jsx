@@ -65,8 +65,22 @@ function App() {
               </PrivateRoute>
             }
           />
-          <Route path="officials" element={<Officials />} />
-          <Route path="documents" element={<Documents />} />
+          <Route
+            path="officials"
+            element={
+              <PrivateRoute adminOnly>
+                <Officials />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="documents"
+            element={
+              <PrivateRoute>
+                <Documents />
+              </PrivateRoute>
+            }
+          />
           <Route path="profile" element={<Profile />} />
             <Route
               path="archives"

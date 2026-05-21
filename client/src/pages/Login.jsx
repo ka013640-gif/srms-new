@@ -103,6 +103,7 @@ const Login = () => {
               }}
             >
               <option value="Admin">Admin</option>
+              <option value="Official">Official</option>
               <option value="Resident">Resident</option>
             </select>
           </Box>

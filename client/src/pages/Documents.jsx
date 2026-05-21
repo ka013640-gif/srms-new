@@ -6,6 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, CircularProgress, Chip, Divider, Collapse, Alert
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import {
   Add, Close, ExpandMore, ExpandLess, Description,
   Download, FileUpload, CheckCircle, Cancel as CancelIcon,
@@ -16,7 +17,14 @@ import api from '../services/api';
 
 const Documents = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role === 'ADMIN';
+
+  useEffect(() => {
+    if (user?.role === 'OFFICIAL') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openRequest, setOpenRequest] = useState(false);

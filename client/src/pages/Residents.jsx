@@ -32,6 +32,7 @@ import { useAuth } from '../context/AuthContext';
 
 const Residents = () => {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -118,8 +119,8 @@ const Residents = () => {
   };
 
   const handleOpen = (resident = null) => {
+    if (!isAdmin) return;
     if (resident) {
-      setEditing(resident);
       const birth = resident.birthday?.split('T')[0] || resident.birthdate?.split('T')[0] || '';
       const today = new Date();
       const birthDate = new Date(birth);
@@ -131,6 +132,7 @@ const Residents = () => {
           age--;
         }
       }
+      setEditing(resident);
       setFormData({
         full_name: resident.full_name,
         age: age,
@@ -192,7 +194,8 @@ const Residents = () => {
   };
 
   const handleDelete = async (id) => {
-     if (window.confirm('Are you sure you want to delete this resident?')) {
+    if (!isAdmin) return;
+    if (window.confirm('Are you sure you want to delete this resident?')) {
        try {
          await api.delete(`residents/${id}`);
          if (residents.length === 1 && page > 1) {
@@ -304,7 +307,7 @@ const Residents = () => {
         <Typography variant="h4" fontWeight={600} color="#1e293b">
           Residents Database
         </Typography>
-        {user?.role === 'ADMIN' && (
+        {isAdmin && (
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button
               variant="contained"
@@ -375,12 +378,18 @@ const Residents = () => {
                 <TableCell>{resident.address}</TableCell>
                 <TableCell>{resident.contact || '-'}</TableCell>
                 <TableCell>
-                  <IconButton size="small" onClick={() => handleOpen(resident)}>
-                    <Edit fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" onClick={() => handleDelete(resident.resident_id)} color="error">
-                    <Delete fontSize="small" />
-                  </IconButton>
+                  {isAdmin ? (
+                    <>
+                      <IconButton size="small" onClick={() => handleOpen(resident)}>
+                        <Edit fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleDelete(resident.resident_id)} color="error">
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </>
+                  ) : (
+                    '-'
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -477,9 +486,9 @@ const Residents = () => {
             <FormControl fullWidth>
               <InputLabel>Civil Status</InputLabel>
               <Select
-                value={accountForm.civil_status}
+                value={formData.civil_status}
                 label="Civil Status"
-                onChange={(e) => setAccountForm({ ...accountForm, civil_status: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, civil_status: e.target.value })}
               >
                 <MenuItem value="Single">Single</MenuItem>
                 <MenuItem value="Married">Married</MenuItem>
