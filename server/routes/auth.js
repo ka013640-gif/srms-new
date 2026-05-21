@@ -250,6 +250,42 @@ router.post('/create-account', authenticate, authorize('ADMIN'), validate(create
   }
 });
 
+// GET /api/auth/me — full profile (user + resident + optional official), any authenticated user
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { user_id: req.user.id },
+      select: {
+        user_id: true, username: true, fullName: true,
+        role: true, email: true, profilePicture: true, created_at: true,
+        resident: {
+          select: {
+            resident_id: true, full_name: true, birthday: true,
+            age: true, gender: true, address: true, contact: true,
+            occupation: true, civil_status: true, status: true
+          }
+        }
+      }
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let response = { user };
+    if (user.role === 'OFFICIAL') {
+      const official = await prisma.official.findFirst({
+        where: { name: user.fullName, deleted_at: null },
+        select: { official_id: true, position: true, term_start: true, term_end: true }
+      });
+      response.official = official || null;
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('Failed to fetch profile:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
 // ── helpers ──
 
 function calculateAge(birthday) {
