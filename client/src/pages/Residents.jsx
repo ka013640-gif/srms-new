@@ -242,7 +242,7 @@ const Residents = () => {
     setAccountForm({
       ...accountForm,
       accountType: type,
-      occupation: type === 'official' ? 'Barangay Official' : accountForm.occupation
+      occupation: type === 'official' ? 'Barangay Official' : ''
     });
   };
 
@@ -302,22 +302,24 @@ const Residents = () => {
         <Typography variant="h4" fontWeight={600} color="#1e293b">
           Residents Database
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => handleOpen()}
-          sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
-        >
-          Add Resident
-        </Button>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={handleOpenAddAccount}
-          sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
-        >
-          Add Account
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => handleOpen()}
+            sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
+          >
+            Add Resident
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={handleOpenAddAccount}
+            sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
+          >
+            Add Account
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
@@ -471,9 +473,9 @@ const Residents = () => {
             <FormControl fullWidth>
               <InputLabel>Civil Status</InputLabel>
               <Select
-                value={formData.civil_status}
+                value={accountForm.civil_status}
                 label="Civil Status"
-                onChange={(e) => setFormData({ ...formData, civil_status: e.target.value })}
+                onChange={(e) => setAccountForm({ ...accountForm, civil_status: e.target.value })}
               >
                 <MenuItem value="Single">Single</MenuItem>
                 <MenuItem value="Married">Married</MenuItem>
@@ -592,6 +594,12 @@ const Residents = () => {
               fullWidth
               value={accountForm.contact}
               onChange={(e) => setAccountForm({ ...accountForm, contact: e.target.value })}
+            />
+            <TextField
+              label="Occupation"
+              fullWidth
+              value={accountForm.occupation}
+              onChange={(e) => setAccountForm({ ...accountForm, occupation: e.target.value })}
             />
             <FormControl fullWidth>
               <InputLabel>Civil Status</InputLabel>
