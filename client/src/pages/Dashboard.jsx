@@ -129,117 +129,90 @@ const Dashboard = () => {
     }
   };
 
-  return (
+   return (
     <Box>
-      {/* Topbar */}
+      {/* ── Topbar ── */}
       <Box
         sx={{
           background: 'white',
-          padding: '20px 30px',
+          px: 4,
+          py: 2.5,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          borderBottom: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(15,23,42,.05)',
         }}
       >
-        <Typography variant="h4" fontWeight={600} color="#1e293b">
-          BARANGAY INFORMATION MANAGEMENT SYSTEM
-        </Typography>
-        <a href="/" style={{ textDecoration: 'none' }}>
-          <Box
-            component="button"
-            sx={{
-              bgcolor: '#1e293b',
-              color: 'white',
-              px: 3,
-              py: 1,
-              borderRadius: 1,
-              fontWeight: 500,
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            HOME
+        <Typography variant="h5" fontWeight={700} color="#0f172a" letterSpacing={-.3}>
+          BARANGAY INFORMATION
+          <Box component="span" display="block" sx={{ fontSize: '13px', fontWeight: 400, color: '#64748b', mt: 0.25 }}>
+            Management System
           </Box>
-        </a>
+        </Typography>
+        <Box
+          component="button"
+          onClick={() => navigate(0)}
+          sx={{
+            bgcolor: '#0f172a',
+            color: 'white',
+            px: 2.5,
+            py: 1,
+            borderRadius: 1.5,
+            fontWeight: 600,
+            fontSize: '13px',
+            letterSpacing: '.3px',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'background .15s',
+            '&:hover': { bgcolor: '#1e293b' },
+          }}
+        >
+          ⌂ &nbsp;HOME
+        </Box>
       </Box>
 
-      <Box sx={{ p: 3 }}>
-        <Paper sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-          <Typography variant="h5" fontWeight={600} color="#1e293b" mb={1}>
-            Welcome!
+      <Box sx={{ p: 3.5 }}>
+        <Paper sx={{ p: 5, borderRadius: 3, boxShadow: '0 1px 3px rgba(15,23,42,.06)' }}>
+          <Typography variant="h5" fontWeight={700} color="#0f172a" mb={0.5}>
+            Welcome back, {user?.fullName?.split(' ')[0] || user?.fullName || 'User'}
           </Typography>
-          <Typography variant="body1" color="#64748b" mb={4}>
-            Use the sidebar to navigate through the system modules.
+          <Typography variant="body2" color="#64748b" mb={4}>
+            Use the sidebar to navigate through the system modules.          
           </Typography>
 
           {/* Stats Cards */}
           <Grid container spacing={3} mb={4}>
-            <Grid item xs={12} md={4}>
-              <Paper
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  bgcolor: '#eff6ff',
-                  borderLeft: '4px solid #3b82f6'
-                }}
-              >
-                <People sx={{ fontSize: 40, color: '#3b82f6' }} />
-                <Box>
-                  <Typography variant="h3" fontWeight={700} color="#1e293b">
-                    {loading ? <CircularProgress size={24} /> : stats.residents}
-                  </Typography>
-                  <Typography variant="body2" color="#64748b">Active Residents</Typography>
-                </Box>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <Paper
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  bgcolor: '#f0fdf4',
-                  borderLeft: '4px solid #16a34a'
-                }}
-              >
-                <FolderOpen sx={{ fontSize: 40, color: '#16a34a' }} />
-                <Box>
-                  <Typography variant="h3" fontWeight={700} color="#1e293b">
-                    {loading ? <CircularProgress size={24} /> : stats.projects}
-                  </Typography>
-                  <Typography variant="body2" color="#64748b">Active Projects</Typography>
-                </Box>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <Paper
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  bgcolor: '#fff7ed',
-                  borderLeft: '4px solid #f97316'
-                }}
-              >
-                <Description sx={{ fontSize: 40, color: '#f97316' }} />
-                <Box>
-                  <Typography variant="h3" fontWeight={700} color="#1e293b">
-                    {loading ? <CircularProgress size={24} /> : stats.requests}
-                  </Typography>
-                  <Typography variant="body2" color="#64748b">Pending Requests</Typography>
-                </Box>
-              </Paper>
-            </Grid>
+            {[
+              { Icon: People,     label: 'Active Residents', value: stats.residents, color: '#3b82f6',   bg: '#eff6ff', border: '#3b82f6' },
+              { Icon: FolderOpen, label: 'Active Projects',  value: stats.projects,  color: '#16a34a',   bg: '#f0fdf4', border: '#16a34a' },
+              { Icon: Description,label: 'Pending Requests', value: stats.requests,  color: '#f97316',   bg: '#fff7ed', border: '#f97316' },
+            ].map(({ Icon, label, value, color, bg, border }) => (
+              <Grid item xs={12} md={4} key={label}>
+                <Paper
+                  sx={{
+                    p: 3,
+                    borderRadius: 2.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    bgcolor: bg,
+                    borderLeft: `4px solid ${border}`,
+                    boxShadow: '0 1px 4px rgba(0,0,0,.04)',
+                    transition: 'box-shadow .2s, transform .15s',
+                    '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,.08)', transform: 'translateY(-2px)' },
+                  }}
+                >
+                  <Icon sx={{ fontSize: 38, color }} />
+                  <Box>
+                    <Typography variant="h3" fontWeight={800} color="#0f172a" lineHeight={1.2}>
+                      {loading ? <CircularProgress size={22} thickness={5} sx={{ color }} /> : value}
+                    </Typography>
+                    <Typography variant="body2" color="#64748b" sx={{ mt: 0.25, fontWeight: 500 }}>{label}</Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+            ))}
           </Grid>
 
           {/* Announcements */}

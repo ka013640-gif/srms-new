@@ -303,17 +303,26 @@ const Residents = () => {
   return (
     <Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={600} color="#1e293b">
-          Residents Database
-        </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h4" fontWeight={700} color="#0f172a" sx={{ letterSpacing: '-.3px' }}>
+            Residents Database
+          </Typography>
+          <Typography variant="body2" color="#64748b" sx={{ mt: 0.5 }}>
+            Manage registered resident accounts and personal records.
+          </Typography>
+        </Box>
         {isAdmin && (
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
             <Button
               variant="contained"
               startIcon={<Add />}
               onClick={() => handleOpen()}
-              sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
+              sx={{
+                bgcolor: '#1e293b', color: 'white', borderRadius: 1.5,
+                boxShadow: 'none', fontWeight: 600, px: 2, py: 0.75, fontSize: '13px',
+                '&:hover': { bgcolor: '#0f172a', boxShadow: '0 4px 12px rgba(15,23,42,.25)' },
+              }}
             >
               Add Resident
             </Button>
@@ -321,7 +330,11 @@ const Residents = () => {
               variant="contained"
               startIcon={<Add />}
               onClick={handleOpenAddAccount}
-              sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
+              sx={{
+                bgcolor: '#16a34a', color: 'white', borderRadius: 1.5,
+                boxShadow: 'none', fontWeight: 600, px: 2, py: 0.75, fontSize: '13px',
+                '&:hover': { bgcolor: '#15803d', boxShadow: '0 4px 12px rgba(22,163,74,.25)' },
+              }}
             >
               Add Account
             </Button>
@@ -329,58 +342,77 @@ const Residents = () => {
         )}
       </Box>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+      <TableContainer component={Paper} sx={{ borderRadius: 2.5, boxShadow: '0 1px 3px rgba(15,23,42,.06)', overflow: 'hidden' }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f8fafc' }}>
             <TableRow>
-              <TableCell 
+              <TableCell
                 onClick={() => handleSort('full_name')}
-                sx={{ cursor: 'pointer', fontWeight: 600, width: '25%' }}
+                sx={{ cursor: 'pointer', fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '25%' }}
               >
                 Name <SortIndicator field="full_name" />
               </TableCell>
-              <TableCell 
+              <TableCell
                 onClick={() => handleSort('age')}
-                sx={{ cursor: 'pointer', fontWeight: 600, width: '10%' }}
+                sx={{ cursor: 'pointer', fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '10%' }}
               >
                 Age <SortIndicator field="age" />
               </TableCell>
-              <TableCell 
+              <TableCell
                 onClick={() => handleSort('gender')}
-                sx={{ cursor: 'pointer', fontWeight: 600, width: '15%' }}
+                sx={{ cursor: 'pointer', fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '15%' }}
               >
                 Gender <SortIndicator field="gender" />
               </TableCell>
-              <TableCell 
+              <TableCell
                 onClick={() => handleSort('status')}
-                sx={{ cursor: 'pointer', fontWeight: 600, width: '15%' }}
+                sx={{ cursor: 'pointer', fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '15%' }}
               >
                 Status <SortIndicator field="status" />
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, width: '20%' }}>Address</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: '10%' }}>Contact</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: '5%' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '20%' }}>
+                Address
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '10%' }}>
+                Contact
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '5%' }}>
+                Actions
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {residents.map((resident) => (
-              <TableRow key={resident.resident_id} hover>
-                <TableCell>{resident.full_name}</TableCell>
-                <TableCell>{resident.age}</TableCell>
-                <TableCell>{resident.gender}</TableCell>
+            {residents.map((resident, idx) => (
+              <TableRow
+                key={resident.resident_id}
+                hover
+                sx={{
+                  '& td': { borderBottom: idx < residents.length - 1 ? '1px solid #f1f5f9' : 'none' },
+                  transition: 'background .12s',
+                }}
+              >
+                <TableCell sx={{ color: '#1e293b', fontWeight: 500 }}>{resident.full_name}</TableCell>
+                <TableCell sx={{ color: '#475569' }}>{resident.age}</TableCell>
+                <TableCell sx={{ color: '#475569' }}>{resident.gender}</TableCell>
                 <TableCell>
                   <Chip
                     label={resident.status}
                     size="small"
-                    color={resident.status === 'Active' ? 'success' : 'error'}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '11px',
+                      letterSpacing: '.3px',
+                      bgcolor: resident.status === 'Active' ? '#dcfce7' : '#fee2e2',
+                      color: resident.status === 'Active' ? '#16a34a' : '#dc2626',
+                    }}
                   />
                 </TableCell>
-                <TableCell>{resident.address}</TableCell>
-                <TableCell>{resident.contact || '-'}</TableCell>
+                <TableCell sx={{ color: '#64748b' }}>{resident.address}</TableCell>
+                <TableCell sx={{ color: '#64748b' }}>{resident.contact || '—'}</TableCell>
                 <TableCell>
                   {isAdmin ? (
                     <>
-                      <IconButton size="small" onClick={() => handleOpen(resident)}>
+                      <IconButton size="small" onClick={() => handleOpen(resident)} sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9', color: '#1e293b' } }}>
                         <Edit fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => handleDelete(resident.resident_id)} color="error">
@@ -388,15 +420,14 @@ const Residents = () => {
                       </IconButton>
                     </>
                   ) : (
-                    '-'
+                    '—'
                   )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
-          </Table>
-        </TableContainer>
-
+        </Table>
+      </TableContainer>
         {totalPages > 1 && (
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
             <Pagination

@@ -65,11 +65,17 @@ const Profile = () => {
 
   // ── Shared info row ──────────────────────────────────────
   const InfoRow = ({ icon: Icon, label, value }) => (
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-      <Box sx={{ color: '#64748b', mt: 0.25 }}><Icon fontSize="small" /></Box>
-      <Box>
-        <Typography variant="body2" color="#64748b">{label}</Typography>
-        <Typography variant="body1">{value || '—'}</Typography>
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, py: 0.75 }}>
+      <Box sx={{ color: '#64748b', pt: 0.5, display: 'flex' }}>
+        <Icon fontSize="small" />
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" color="#94a3b8" sx={{ fontWeight: 500, letterSpacing: '.1px', textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+          {label}
+        </Typography>
+        <Typography variant="body2" color="#1e293b" sx={{ fontWeight: 500 }}>
+          {value || '—'}
+        </Typography>
       </Box>
     </Box>
   );
@@ -82,8 +88,8 @@ const Profile = () => {
     );
 
   return (
-    <Box>
-      <Typography variant="h4" fontWeight={600} color="#1e293b" mb={3}>
+    <Box sx={{ p: 3.5 }}>
+      <Typography variant="h4" fontWeight={700} color="#0f172a" mb={4} sx={{ letterSpacing: '-.3px' }}>
         My Profile
       </Typography>
 
@@ -93,8 +99,8 @@ const Profile = () => {
       {role === 'ADMIN' && (
         <Grid container spacing={3}>
           <Grid item xs={12}>
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" fontWeight={600} color="#1e293b" mb={2}>
+            <Paper sx={{ p: 3.5, borderRadius: 3, boxShadow: '0 1px 3px rgba(15,23,42,.06)' }}>
+              <Typography variant="h6" fontWeight={700} color="#0f172a" mb={3.5} sx={{ letterSpacing: '-.1px' }}>
                 Account Information
               </Typography>
               <Grid container spacing={3}>
@@ -116,49 +122,46 @@ const Profile = () => {
 
       {/* ══════════════════════════════════════════
           OFFICIAL & RESIDENT — split view
-          Left : Resident / Role-specific info
-          Right: Account Information
       ══════════════════════════════════════════ */}
       {isOfficialOrResident && (
         <Grid container spacing={3}>
           {/* ── Left: Resident / Role Information ── */}
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" fontWeight={600} color="#1e293b" mb={2}>
-                {role === 'OFFICIAL' ? 'Official Information' : 'Resident Information'}
+            <Paper sx={{ p: 3.5, borderRadius: 3, boxShadow: '0 1px 3px rgba(15,23,42,.06)' }}>
+              <Typography variant="h6" fontWeight={700} color="#0f172a" mb={3.5} sx={{ letterSpacing: '-.1px' }}>
+                {role === 'OFFICIAL' ? 'Role Information' : 'Resident Information'}
               </Typography>
 
-              {/* Full name sourced from resident profile if available, fallback to account */}
               <Grid container spacing={3}>
-                  {[
-                    { icon: Person,       label: 'Full Name',    value: data.full_name || data.fullName },
-                    { icon: Home,         label: 'Address',      value: data.address },
-                    { icon: CalendarToday,label: 'Birthday',     value: formatDate(data.birthday) },
-                    { icon: Badge,        label: 'Age',          value: data.age },
-                    { icon: Transgender,  label: 'Gender',       value: data.gender },
-                    { icon: Phone,        label: 'Contact',      value: data.contact },
-                    { icon: Work,         label: 'Occupation',   value: data.occupation },
-                    { icon: Favorite,     label: 'Civil Status', value: data.civil_status },
-                    ...(role === 'OFFICIAL'
-                      ? [
-                          { icon: Badge, label: 'Position',     value: data.position },
-                          { icon: Badge, label: 'Term Start',   value: formatDate(data.term_start) },
-                          { icon: Badge, label: 'Term End',     value: formatDate(data.term_end) },
-                        ]
-                      : []),
-                  ].map(({ icon: Icon, label, value }) => (
-                    <Grid item xs={12} sm={6} key={label}>
-                      <InfoRow icon={Icon} label={label} value={value} />
-                    </Grid>
-                  ))}
-                </Grid>
+                {[
+                  { icon: Person,       label: 'Full Name',    value: data.full_name || data.fullName },
+                  { icon: Home,         label: 'Address',      value: data.address },
+                  { icon: CalendarToday,label: 'Birthday',     value: formatDate(data.birthday) },
+                  { icon: Badge,        label: 'Age',          value: data.age },
+                  { icon: Transgender,  label: 'Gender',       value: data.gender },
+                  { icon: Phone,        label: 'Contact',      value: data.contact },
+                  { icon: Work,         label: 'Occupation',   value: data.occupation },
+                  { icon: Favorite,     label: 'Civil Status', value: data.civil_status },
+                  ...(role === 'OFFICIAL'
+                    ? [
+                        { icon: Badge, label: 'Position',     value: data.position },
+                        { icon: Badge, label: 'Term Start',   value: formatDate(data.term_start) },
+                        { icon: Badge, label: 'Term End',     value: formatDate(data.term_end) },
+                      ]
+                    : []),
+                ].map(({ icon: Icon, label, value }) => (
+                  <Grid item xs={12} sm={6} key={label}>
+                    <InfoRow icon={Icon} label={label} value={value} />
+                  </Grid>
+                ))}
+              </Grid>
             </Paper>
           </Grid>
 
           {/* ── Right: Account Information ── */}
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" fontWeight={600} color="#1e293b" mb={2}>
+            <Paper sx={{ p: 3.5, borderRadius: 3, boxShadow: '0 1px 3px rgba(15,23,42,.06)' }}>
+              <Typography variant="h6" fontWeight={700} color="#0f172a" mb={3.5} sx={{ letterSpacing: '-.1px' }}>
                 Account Information
               </Typography>
               <Grid container spacing={3}>
