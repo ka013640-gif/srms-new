@@ -301,11 +301,11 @@ const Residents = () => {
   );
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h4" fontWeight={700} color="#0f172a" sx={{ letterSpacing: '-.3px' }}>
+          <Typography variant="h4" fontWeight={700} color="#0f172a">
             Residents Database
           </Typography>
           <Typography variant="body2" color="#64748b" sx={{ mt: 0.5 }}>

@@ -15,7 +15,8 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Chip
 } from '@mui/material';
 import { Add, Edit, Delete, CalendarMonth, AccessTime, LocationOn, EventNote } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +26,12 @@ const SESSIONS_ACCENT = {
   COMPLETED:   { color: '#16a34a', bg: 'rgba(22,163,74,.12)' },
   SCHEDULED:   { color: '#0369a1', bg: 'rgba(3,105,161,.12)' },
   CANCELLED:   { color: '#dc2626', bg: 'rgba(220,38,38,.12)' },
+};
+
+const STATUS_LABEL = {
+  COMPLETED:   '#dcfce7',
+  SCHEDULED:   '#e0f2fe',
+  CANCELLED:   '#fee2e2',
 };
 
 const formatDate = (val) => val ? new Date(val).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -125,10 +132,10 @@ const Sessions = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, gap: 2, flexWrap: 'wrap' }}>
         <Box>
           <Typography variant="h4" fontWeight={700} color="#0f172a">Barangay Sessions</Typography>
-          <Typography variant="body2" color="#94a3b8" sx={{ mt: 0.5 }}>Manage scheduled community meetings and assemblies</Typography>
+          <Typography variant="body2" color="#64748b" sx={{ mt: 0.5 }}>Manage scheduled community meetings and assemblies</Typography>
         </Box>
         {isAdmin && (
           <Button
@@ -177,7 +184,7 @@ const Sessions = () => {
                   <Box sx={{ height: 4, bgcolor: accent.color }} />
 
                   <Box sx={{ p: 2.75, display: 'flex', flexDirection: 'column', minHeight: 230 }}>
-                    {/* Header row — title + actions */}
+                    {/* Header row — title + status ── */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         <Box sx={{
@@ -191,31 +198,47 @@ const Sessions = () => {
                           {session.title}
                         </Typography>
                       </Box>
-                      {isAdmin && (
-                        <Box sx={{ display: 'flex' }}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleOpen(session)}
-                            sx={{
-                              color: '#64748b', borderRadius: 1.5,
-                              '&:hover': { bgcolor: '#f1f5f9', color: '#1e293b' },
-                            }}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDelete(session.session_id)}
-                            sx={{
-                              color: '#f87171', borderRadius: 1.5,
-                              '&:hover': { bgcolor: '#fef2f2', color: '#dc2626' },
-                            }}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      )}
+                      <Chip
+                        label={session.status}
+                        size="small"
+                        sx={{
+                          bgcolor: STATUS_LABEL[session.status] || '#f1f5f9',
+                          color: accent.color,
+                          fontWeight: 600,
+                          fontSize: '0.68rem',
+                          height: 22,
+                          flexShrink: 0,
+                        }}
+                      />
                     </Box>
+
+                    {/* Actions */}
+                    {isAdmin && (
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mb: 1.5 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpen(session)}
+                          sx={{
+                            color: '#64748b',
+                            borderRadius: 1.5,
+                            '&:hover': { bgcolor: '#f1f5f9', color: '#1e293b' },
+                          }}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDelete(session.session_id)}
+                          sx={{
+                            color: '#f87171',
+                            borderRadius: 1.5,
+                            '&:hover': { bgcolor: '#fef2f2', color: '#dc2626' },
+                          }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    )}
 
                     {/* Description */}
                     <Typography
@@ -229,12 +252,12 @@ const Sessions = () => {
                     {/* Spacer */}
                     <Box sx={{ flex: 1 }} />
 
-                    {/* Meta rows  */}
+                    {/* Meta rows ── */}
                     <Box
                       sx={{
                         display: 'flex', flexDirection: 'column', gap: 0.75,
                         pt: 1.5,
-                        mb: isAdmin ? 1.5 : 0,
+                        borderTop: '1px solid #f1f5f9',
                       }}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -256,9 +279,6 @@ const Sessions = () => {
                         </Typography>
                       </Box>
                     </Box>
-
-                    {/* Bottom border */}
-                    <Box sx={{ borderTop: '1px solid #f1f5f9', pt: 1.5 }} />
                   </Box>
                 </Paper>
               </Grid>

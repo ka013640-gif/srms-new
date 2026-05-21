@@ -112,6 +112,8 @@ const Officials = () => {
     }
   };
 
+  const formatDate = (val) => val ? new Date(val).toLocaleDateString() : '—';
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
@@ -121,55 +123,92 @@ const Officials = () => {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight={600} color="#1e293b">
-          Barangay Officials
-        </Typography>
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h4" fontWeight={700} color="#0f172a">
+            Barangay Officials
+          </Typography>
+          <Typography variant="body2" color="#64748b" sx={{ mt: 0.5 }}>
+            Manage elected and appointed barangay officials
+          </Typography>
+        </Box>
         {user?.role === 'ADMIN' && (
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => handleOpen()}
-            sx={{ bgcolor: '#1e293b', '&:hover': { bgcolor: '#334155' } }}
+            sx={{
+              bgcolor: '#1e293b', color: 'white', borderRadius: 1.5,
+              boxShadow: 'none', fontWeight: 600, px: 2, py: 0.75, fontSize: '13px',
+              '&:hover': { bgcolor: '#0f172a', boxShadow: '0 4px 12px rgba(15,23,42,.25)' },
+            }}
           >
             Add Official
           </Button>
         )}
       </Box>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+      <TableContainer component={Paper} sx={{ borderRadius: 2.5, boxShadow: '0 1px 3px rgba(15,23,42,.06)', overflow: 'hidden' }}>
         <Table>
           <TableHead sx={{ bgcolor: '#f8fafc' }}>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Position</TableCell>
-              <TableCell>Contact</TableCell>
-              <TableCell>Term Start</TableCell>
-              <TableCell>Term End</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase' }}>
+                Name
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase' }}>
+                Position
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase' }}>
+                Contact
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase' }}>
+                Term Start
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase' }}>
+                Term End
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase' }}>
+                Status
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '12px', letterSpacing: '.3px', textTransform: 'uppercase', width: '5%' }}>
+                Actions
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {officials.map((official) => (
-              <TableRow key={official.id} hover sx={{ opacity: official.is_active ? 1 : 0.55 }}>
-                <TableCell>{official.name}</TableCell>
-                <TableCell>{official.position}</TableCell>
-                <TableCell>{official.contact || '-'}</TableCell>
-                <TableCell>{new Date(official.term_start).toLocaleDateString()}</TableCell>
-                <TableCell>{official.term_end ? new Date(official.term_end).toLocaleDateString() : 'Ongoing'}</TableCell>
+            {officials.map((official, idx) => (
+              <TableRow
+                key={official.id}
+                hover
+                sx={{
+                  '& td': { borderBottom: idx < officials.length - 1 ? '1px solid #f1f5f9' : 'none' },
+                  transition: 'background .12s',
+                  opacity: official.is_active ? 1 : 0.55,
+                }}
+              >
+                <TableCell sx={{ color: '#1e293b', fontWeight: 500 }}>{official.name}</TableCell>
+                <TableCell sx={{ color: '#475569' }}>{official.position}</TableCell>
+                <TableCell sx={{ color: '#475569' }}>{official.contact || '-'}</TableCell>
+                <TableCell sx={{ color: '#475569' }}>{formatDate(official.term_start)}</TableCell>
+                <TableCell sx={{ color: '#475569' }}>{official.term_end ? formatDate(official.term_end) : 'Ongoing'}</TableCell>
                 <TableCell>
                   <Chip
                     label={official.is_active ? 'Active' : 'Inactive'}
                     size="small"
-                    color={official.is_active ? 'success' : 'default'}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '11px',
+                      letterSpacing: '.3px',
+                      bgcolor: official.is_active ? '#dcfce7' : '#f1f5f9',
+                      color: official.is_active ? '#16a34a' : '#64748b',
+                    }}
                   />
                 </TableCell>
                 <TableCell>
                   {user?.role === 'ADMIN' ? (
                     <>
-                      <IconButton size="small" onClick={() => handleOpen(official)}>
+                      <IconButton size="small" onClick={() => handleOpen(official)} sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9', color: '#1e293b' } }}>
                         <Edit fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => handleDelete(official.official_id)} color="error">
@@ -187,8 +226,8 @@ const Officials = () => {
       </TableContainer>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>{editing ? 'Edit Official' : 'Add New Official'}</DialogTitle>
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
+        <DialogTitle sx={{ fontWeight: 600 }}>{editing ? 'Edit Official' : 'Add New Official'}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
             <TextField

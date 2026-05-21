@@ -131,10 +131,10 @@ const Projects = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4, gap: 2, flexWrap: 'wrap' }}>
         <Box>
           <Typography variant="h4" fontWeight={700} color="#0f172a">Community Projects</Typography>
-          <Typography variant="body2" color="#94a3b8" sx={{ mt: 0.5 }}>Manage all barangay community initiatives</Typography>
+          <Typography variant="body2" color="#64748b" sx={{ mt: 0.5 }}>Manage all barangay community initiatives</Typography>
         </Box>
         {isAdmin && (
           <Button
