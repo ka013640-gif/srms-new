@@ -27,7 +27,7 @@ const Login = () => {
     console.log('Attempting login with:', { username, password, role }); // Debug log
 
     try {
-      await login(username, password);
+      await login(username, password, role);
       console.log('Login successful'); // Debug log
       localStorage.setItem('lastRole', role);
       navigate('/');
@@ -163,10 +163,7 @@ const Login = () => {
             {loading ? <CircularProgress size={24} color="inherit" /> : 'Log In'}
           </button>
         </Box>
-
-        <Typography variant="body2" color="#64748b" sx={{ mt: 2 }}>
-          Don't have an account? <a href="/register" style={{ color: '#1c2434', textDecoration: 'underline' }}>Register</a>
-        </Typography>
+        
       </Paper>
     </Box>
   );

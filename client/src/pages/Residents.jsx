@@ -51,6 +51,38 @@ const Residents = () => {
     status: 'Active'
   });
 
+  // Add Account dialog state
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [accountCreateError, setAccountCreateError] = useState('');
+
+  // Full account form state
+  const calculateAge = (birthday) => {
+    if (!birthday) return 0;
+    const today = new Date();
+    const birthDate = new Date(birthday);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age;
+  };
+
+  const [accountForm, setAccountForm] = useState({
+    fullname: '',
+    username: '',
+    password: '',
+    email: '',
+    birthday: '',
+    gender: '',
+    address: '',
+    contact: '',
+    occupation: '',
+    civil_status: '',
+    accountType: 'resident',
+    position: '',
+    term_start: '',
+    term_end: ''
+  });
+
   useEffect(() => {
     fetchResidents();
   }, [page, sortField, sortOrder]);
@@ -172,6 +204,85 @@ const Residents = () => {
      }
    };
 
+  // ── Add Account handlers ──
+
+  const handleOpenAddAccount = () => {
+    setAccountForm({
+      fullname: '',
+      username: '',
+      password: '',
+      email: '',
+      birthday: '',
+      gender: '',
+      address: '',
+      contact: '',
+      occupation: '',
+      civil_status: '',
+      accountType: 'resident',
+      position: '',
+      term_start: '',
+      term_end: ''
+    });
+    setAccountCreateError('');
+    setAddAccountOpen(true);
+  };
+
+  const handleCloseAddAccount = () => {
+    setAddAccountOpen(false);
+    setAccountForm({
+      fullname: '', username: '', password: '', email: '', birthday: '',
+      gender: '', address: '', contact: '', occupation: '', civil_status: '',
+      accountType: 'resident', position: '', term_start: '', term_end: ''
+    });
+    setAccountCreateError('');
+  };
+
+  const handleAccountTypeChange = (e) => {
+    const type = e.target.value;
+    setAccountForm({
+      ...accountForm,
+      accountType: type,
+      occupation: type === 'official' ? 'Barangay Official' : accountForm.occupation
+    });
+  };
+
+  const handleAccountBirthdayChange = (e) => {
+    const birthday = e.target.value;
+    setAccountForm({ ...accountForm, birthday });
+  };
+
+  const handleAccountSubmit = async () => {
+    try {
+      setAccountCreateError('');
+
+      const payload = {
+        fullname: accountForm.fullname,
+        username: accountForm.username,
+        password: accountForm.password,
+        email: accountForm.email,
+        birthday: accountForm.birthday,
+        gender: accountForm.gender,
+        address: accountForm.address,
+        contact: accountForm.contact,
+        occupation: accountForm.occupation,
+        civil_status: accountForm.civil_status,
+        accountType: accountForm.accountType,
+        status: 'Active',
+        position: accountForm.position,
+        term_start: accountForm.term_start,
+        term_end: accountForm.term_end
+      };
+
+      await api.post('auth/create-account', payload);
+
+      handleCloseAddAccount();
+      fetchResidents();
+    } catch (error) {
+      console.error('Failed to create account:', error);
+      setAccountCreateError(error.response?.data?.error || 'Failed to create account');
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
@@ -198,6 +309,14 @@ const Residents = () => {
           sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
         >
           Add Resident
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={<Add />}
+          onClick={handleOpenAddAccount}
+          sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
+        >
+          Add Account
         </Button>
       </Box>
 
@@ -380,6 +499,168 @@ const Residents = () => {
           <Button onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained" sx={{ bgcolor: '#1e293b' }}>
             {editing ? 'Update' : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Account Dialog */}
+      <Dialog open={addAccountOpen} onClose={handleCloseAddAccount} maxWidth="sm" fullWidth>
+        <DialogTitle>Create Account</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            {/* Account Type toggle */}
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant={accountForm.accountType === 'resident' ? 'contained' : 'outlined'}
+                onClick={() => handleAccountTypeChange({ target: { value: 'resident' } })}
+                sx={{ flex: 1, bgcolor: accountForm.accountType === 'resident' ? '#3b82f6' : 'transparent' }}
+              >
+                Resident
+              </Button>
+              <Button
+                variant={accountForm.accountType === 'official' ? 'contained' : 'outlined'}
+                onClick={() => handleAccountTypeChange({ target: { value: 'official' } })}
+                sx={{ flex: 1, bgcolor: accountForm.accountType === 'official' ? '#16a34a' : 'transparent' }}
+              >
+                Barangay Official
+              </Button>
+            </Box>
+
+            <TextField
+              label="Full Name"
+              fullWidth
+              value={accountForm.fullname}
+              onChange={(e) => setAccountForm({ ...accountForm, fullname: e.target.value })}
+            />
+            <TextField
+              label="Username"
+              fullWidth
+              value={accountForm.username}
+              onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
+            />
+            <TextField
+              label="Password"
+              type="password"
+              fullWidth
+              value={accountForm.password}
+              onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
+            />
+            <TextField
+              label="Email"
+              type="email"
+              fullWidth
+              value={accountForm.email}
+              onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })}
+            />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Birthday"
+                type="date"
+                sx={{ flex: 2 }}
+                value={accountForm.birthday}
+                onChange={handleAccountBirthdayChange}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Age"
+                type="number"
+                sx={{ flex: 1 }}
+                value={calculateAge(accountForm.birthday)}
+                InputProps={{ readOnly: true }}
+              />
+            </Box>
+            <FormControl fullWidth>
+              <InputLabel>Gender</InputLabel>
+              <Select
+                value={accountForm.gender}
+                label="Gender"
+                onChange={(e) => setAccountForm({ ...accountForm, gender: e.target.value })}
+              >
+                <MenuItem value="Male">Male</MenuItem>
+                <MenuItem value="Female">Female</MenuItem>
+                <MenuItem value="Other">Other</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              label="Address"
+              fullWidth
+              value={accountForm.address}
+              onChange={(e) => setAccountForm({ ...accountForm, address: e.target.value })}
+            />
+            <TextField
+              label="Contact"
+              fullWidth
+              value={accountForm.contact}
+              onChange={(e) => setAccountForm({ ...accountForm, contact: e.target.value })}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Civil Status</InputLabel>
+              <Select
+                value={accountForm.civil_status}
+                label="Civil Status"
+                onChange={(e) => setAccountForm({ ...accountForm, civil_status: e.target.value })}
+              >
+                <MenuItem value="Single">Single</MenuItem>
+                <MenuItem value="Married">Married</MenuItem>
+                <MenuItem value="Widowed">Widowed</MenuItem>
+                <MenuItem value="Separated">Separated</MenuItem>
+                <MenuItem value="Divorced">Divorced</MenuItem>
+              </Select>
+            </FormControl>
+
+            {accountForm.accountType === 'official' && (
+              <Box sx={{
+                p: 2,
+                borderRadius: 1,
+                bgcolor: '#f0fdf4',
+                border: '1px solid #86efac',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2
+              }}>
+                <Typography variant="body1" fontWeight={600} color="#15803d">
+                  Barangay Official Details
+                </Typography>
+                <TextField
+                  label="Occupation"
+                  fullWidth
+                  value={accountForm.occupation}
+                  InputProps={{ readOnly: true }}
+                  helperText="Auto-set for officials"
+                />
+                <TextField
+                  label="Position"
+                  fullWidth
+                  value={accountForm.position}
+                  onChange={(e) => setAccountForm({ ...accountForm, position: e.target.value })}
+                  helperText="e.g. Barangay Captain, Kagawad, Secretary"
+                />
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField
+                    label="Term Start"
+                    type="date"
+                    sx={{ flex: 1 }}
+                    value={accountForm.term_start}
+                    onChange={(e) => setAccountForm({ ...accountForm, term_start: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField
+                    label="Term End"
+                    type="date"
+                    sx={{ flex: 1 }}
+                    value={accountForm.term_end}
+                    onChange={(e) => setAccountForm({ ...accountForm, term_end: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddAccount}>Cancel</Button>
+          <Button onClick={handleAccountSubmit} variant="contained" sx={{ bgcolor: '#1e293b' }}>
+            Create Account
           </Button>
         </DialogActions>
       </Dialog>

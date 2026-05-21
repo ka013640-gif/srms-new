@@ -2,7 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import prisma from '../prisma.js';
-import { validate, loginValidation, registerValidation } from '../middleware/validate.js';
+import { validate, loginValidation, registerValidation, createAccountValidation } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -95,10 +95,15 @@ router.post('/login', validate(loginValidation), async (req, res) => {
       return;
     }
 
-    // Role validation (informational only - doesn't block login)
-    // If role is provided, just log it for reference
-    if (role) {
-      console.log(`User ${username} logging in with role: ${role}, actual role: ${user.role}`);
+    // Role validation: selected role must match account's actual role
+    if (!user.role) {
+      res.status(401).json({ error: 'Account has no role assigned. Contact administrator.' });
+      return;
+    }
+
+    if (role && role.toUpperCase() !== user.role) {
+      res.status(401).json({ error: `This account is registered as ${user.role.toLowerCase()}. Please select the correct role.` });
+      return;
     }
 
     const token = generateToken(user);
@@ -114,35 +119,180 @@ router.post('/login', validate(loginValidation), async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error(error);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// GET /api/auth/me (get current user)
-router.get('/me', authenticate, async (req, res) => {
+// POST /api/auth/create-account — creates User + Resident (+ Official) atomically
+router.post('/create-account', validate(createAccountValidation), async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { user_id: req.user.id },
-      select: {
-        user_id: true,
-        username: true,
-        fullName: true,
-        role: true,
-        email: true,
-        profilePicture: true,
-        resident: {
-          select: { resident_id: true, full_name: true, birthday: true, age: true,
-            gender: true, address: true, contact: true, occupation: true, civil_status: true }
-        }
+    const { accountType } = req.body;
+    const { username, password, fullname, email, position, term_start, term_end } = req.body;
+    const age = calculateAge(req.body.birthday);
+
+    // Check username uniqueness
+    const existingUser = await prisma.user.findUnique({ where: { username } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    // Check email uniqueness (when provided)
+    if (email) {
+      const existingEmail = await prisma.resident.findFirst({ where: { email: email.trim() } });
+      if (existingEmail) {
+        return res.status(400).json({ error: 'Email is already in use' });
       }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const now = new Date();
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create user account (always RESIDENT role)
+      const user = await tx.user.create({
+        data: {
+          username: username.trim(),
+          password: hashedPassword,
+          fullName: fullname.trim(),
+          role: 'RESIDENT',
+          email: email?.trim() || null
+        },
+        select: {
+          user_id: true,
+          username: true,
+          fullName: true,
+          role: true,
+          email: true,
+          created_at: true
+        }
+      });
+
+      // 2. Create resident profile linked to the new user
+      const isBirthdayDate = (d) => !isNaN(Date.parse(d));
+
+      let residentData;
+      if (accountType === 'official' && isBirthdayDate(req.body.birthday)) {
+        residentData = await tx.resident.create({
+          data: {
+            user_id: user.user_id,
+            full_name: fullname.trim(),
+            age: age,
+            gender: req.body.gender,
+            birthday: isBirthdayDate(req.body.birthday) ? new Date(req.body.birthday) : null,
+            address: req.body.address.trim(),
+            contact: req.body.contact?.trim() || null,
+            occupation: 'Barangay Official',
+            civil_status: req.body.civil_status,
+            status: 'Active'
+          },
+          select: {
+            resident_id: true,
+            full_name: true,
+            birthday: true,
+            age: true,
+            gender: true,
+            address: true,
+            contact: true,
+            occupation: true,
+            civil_status: true,
+            status: true,
+            created_at: true
+          }
+        });
+      } else {
+        residentData = await tx.resident.create({
+          data: {
+            user_id: user.user_id,
+            full_name: fullname.trim(),
+            age: age,
+            gender: req.body.gender,
+            birthday: isBirthdayDate(req.body.birthday) ? new Date(req.body.birthday) : null,
+            address: req.body.address.trim(),
+            contact: req.body.contact?.trim() || null,
+            occupation: req.body.occupation?.trim() || null,
+            civil_status: req.body.civil_status,
+            status: 'Active'
+          },
+          select: {
+            resident_id: true,
+            full_name: true,
+            birthday: true,
+            age: true,
+            gender: true,
+            address: true,
+            contact: true,
+            occupation: true,
+            civil_status: true,
+            status: true,
+            created_at: true
+          }
+        });
+      }
+
+      // 3. Optionally create official record
+      let official = null;
+      if (accountType === 'official') {
+        const startDate = isBirthdayDate(term_start) ? new Date(term_start) : now;
+        const endDate = isBirthdayDate(term_end) ? new Date(term_end) : null;
+
+        official = await tx.official.create({
+          data: {
+            name: fullname.trim(),
+            position: position.trim(),
+            contact: req.body.contact?.trim() || null,
+            term_start: startDate,
+            term_end: endDate,
+            is_active: true
+          },
+          select: {
+            official_id: true,
+            name: true,
+            position: true,
+            contact: true,
+            term_start: true,
+            term_end: true,
+            is_active: true,
+            created_at: true
+          }
+        });
+      }
+
+      await logActivity(user.user_id, 'CREATE_ACCOUNT',
+        { full_name: residentData.full_name, accountType }, req);
+
+      return { user, resident: residentData, official };
     });
 
-    res.json({ user });
+    res.status(201).json({
+      message: accountType === 'official' ? 'Official account created successfully' : 'Account created successfully',
+      user: result.user,
+      resident: result.resident,
+      official: result.official
+    });
   } catch (error) {
-    console.error('Me error:', error);
-    res.status(500).json({ error: 'Failed to fetch user' });
+    console.error('Create account error:', error);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'A record with this value already exists' });
+    }
+    res.status(500).json({ error: 'Failed to create account', details: error.message });
   }
 });
+
+// ── helpers ──
+
+function calculateAge(birthday) {
+  if (!birthday || !isISO8601(birthday)) return 0;
+  const today = new Date();
+  const birthDate = new Date(birthday);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age;
+}
+
+function isISO8601(str) {
+  return typeof str === 'string' && /^\d{4}-\d{2}-\d{2}/.test(str);
+}
 
 export default router;

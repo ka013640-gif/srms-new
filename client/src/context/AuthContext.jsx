@@ -31,22 +31,9 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (username, password) => {
+  const login = async (username, password, role) => {
     try {
-      const response = await api.post('auth/login', { username, password });
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
-      return user;
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const register = async (fullname, username, password) => {
-    try {
-      const response = await api.post('auth/register', { fullname, username, password });
+      const response = await api.post('auth/login', { username, password, role });
       const { token, user } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -67,7 +54,6 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
-    register,
     logout
   };
 
