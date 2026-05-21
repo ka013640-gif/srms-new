@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Typography, Box, Grid, Paper, CircularProgress, Chip, TextField, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import People from '@mui/icons-material/People';
 import FolderOpen from '@mui/icons-material/FolderOpen';
 import Description from '@mui/icons-material/Description';
@@ -35,6 +35,7 @@ const Dashboard = () => {
   const [announceDialogOpen, setAnnounceDialogOpen] = useState(false);
   const [announceForm, setAnnounceForm] = useState({ title: '', content: '' });
   const [announceLoadingSubmit, setAnnounceLoadingSubmit] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -64,10 +65,11 @@ const Dashboard = () => {
         console.error('Failed to fetch activities:', err);
       }
 
-      if (isOfficialOrAdmin) {
+      if (user) {
         try {
           const annRes = await api.get('announcements');
-          setAnnouncements(annRes.data.announcements);
+          const active = (annRes.data.announcements || []).filter(a => !a.deleted_at);
+          setAnnouncements(active);
         } catch (err) {
           console.error('Failed to fetch announcements:', err);
         } finally {
@@ -82,22 +84,48 @@ const Dashboard = () => {
   }, []);
 
   const handleOpenAnnounce = () => {
+    setEditingAnnouncementId(null);
     setAnnounceForm({ title: '', content: '' });
     setAnnounceDialogOpen(true);
   };
-  const handleCloseAnnounce = () => setAnnounceDialogOpen(false);
+  const handleCloseAnnounce = () => {
+    setAnnounceDialogOpen(false);
+    setEditingAnnouncementId(null);
+    setAnnounceForm({ title: '', content: '' });
+  };
+
+  const handleOpenEdit = (a) => {
+    setEditingAnnouncementId(a.announcement_id);
+    setAnnounceForm({ title: a.title, content: a.content || '' });
+    setAnnounceDialogOpen(true);
+  };
 
   const handleSubmitAnnounce = async () => {
     try {
       setAnnounceLoadingSubmit(true);
-      await api.post('announcements', { ...announceForm, content: announceForm.content || '' });
+      if (editingAnnouncementId) {
+        await api.put(`announcements/${editingAnnouncementId}`, { ...announceForm, content: announceForm.content || '' });
+      } else {
+        await api.post('announcements', { ...announceForm, content: announceForm.content || '' });
+      }
       const annRes = await api.get('announcements');
-      setAnnouncements(annRes.data.announcements);
+      setAnnouncements((annRes.data.announcements || []).filter(a => !a.deleted_at));
       handleCloseAnnounce();
     } catch (err) {
-      console.error('Failed to create announcement:', err);
+      console.error('Failed to save announcement:', err);
     } finally {
       setAnnounceLoadingSubmit(false);
+    }
+  };
+
+  const handleDeleteAnnounce = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this announcement? It will be moved to the archive.')) return;
+    try {
+      await api.delete(`announcements/${id}`);
+      const annRes = await api.get('announcements');
+      setAnnouncements((annRes.data.announcements || []).filter(a => !a.deleted_at));
+    } catch (err) {
+      console.error('Failed to delete announcement:', err);
     }
   };
 
@@ -144,58 +172,6 @@ const Dashboard = () => {
           <Typography variant="body1" color="#64748b" mb={4}>
             Use the sidebar to navigate through the system modules.
           </Typography>
-
-          {/* Announcements */}
-          {isOfficialOrAdmin && (
-            <Box mb={4}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" fontWeight={600} color="#1e293b">
-                  Announcements
-                </Typography>
-              </Box>
-              {announceLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                  <CircularProgress />
-                </Box>
-              ) : announcements.length > 0 ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {announcements.map((a) => (
-                    <Paper key={a.announcement_id} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #e2e8f0' }}>
-                      <Typography variant="subtitle1" fontWeight={700} color="#1e293b">
-                        {a.title}
-                      </Typography>
-                      {a.content && (
-                        <Typography variant="body2" color="#475569" sx={{ mt: 0.75 }}>
-                          {a.content}
-                        </Typography>
-                      )}
-                      <Typography variant="caption" color="#94a3b8" display="block" sx={{ mt: 0.75 }}>
-                        {new Date(a.created_at).toLocaleString()}
-                      </Typography>
-                    </Paper>
-                  ))}
-                </Box>
-              ) : (
-                <Typography variant="body2" color="#64748b" textAlign="center" py={3}>
-                  No announcements yet
-                </Typography>
-              )}
-
-              {/* Add Announcement */}
-              <Box sx={{ mt: 2 }}>
-                {isOfficialOrAdmin && !announceLoading && (
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={handleOpenAnnounce}
-                    sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, textTransform: 'none', fontWeight: 600, borderRadius: 1.5, px: 2.5, py: 1 }}
-                  >
-                    Add Announcement
-                  </Button>
-                )}
-              </Box>
-            </Box>
-          )}
 
           {/* Stats Cards */}
           <Grid container spacing={3} mb={4}>
@@ -266,6 +242,71 @@ const Dashboard = () => {
             </Grid>
           </Grid>
 
+          {/* Announcements */}
+          <Box mb={4}>
+            <Typography variant="h6" fontWeight={600} color="#1e293b" mb={2}>
+              Announcements
+            </Typography>
+            {announceLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                <CircularProgress />
+              </Box>
+            ) : announcements.length > 0 ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {announcements.map((a) => (
+                  <Paper key={a.announcement_id} sx={{ p: 2.5, borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      {/* Left: content */}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="subtitle1" fontWeight={700} color="#1e293b">
+                          {a.title}
+                        </Typography>
+                        {a.content && (
+                          <Typography variant="body2" color="#475569" sx={{ mt: 0.75 }}>
+                            {a.content}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" color="#94a3b8" display="block" sx={{ mt: 0.75 }}>
+                          {new Date(a.created_at).toLocaleString()}
+                        </Typography>
+                      </Box>
+
+                      {/* Right: edit / delete — ADMIN/OFFICIAL only */}
+                      {isOfficialOrAdmin && (
+                        <Box sx={{ display: 'flex', gap: 0.5, ml: 2, flexShrink: 0 }}>
+                          <IconButton size="small" onClick={() => handleOpenEdit(a)} color="primary">
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" onClick={() => handleDeleteAnnounce(a.announcement_id)} color="error">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      )}
+                    </Box>
+                  </Paper>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" color="#64748b" textAlign="center" py={3}>
+                No announcements yet
+              </Typography>
+            )}
+
+            {/* Add Announcement — ADMIN/OFFICIAL only */}
+            {isOfficialOrAdmin && !announceLoading && (
+              <Box sx={{ mt: 2 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleOpenAnnounce}
+                  sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, textTransform: 'none', fontWeight: 600, borderRadius: 1.5, px: 2.5, py: 1 }}
+                >
+                  Add Announcement
+                </Button>
+              </Box>
+            )}
+          </Box>
+
           {/* Recent Activities — ADMIN only */}
           {isAdmin && (
             <Paper sx={{ p: 3, borderRadius: 2, bgcolor: 'white' }}>
@@ -322,7 +363,9 @@ const Dashboard = () => {
 
       {/* Add Announcement Dialog */}
       <Dialog open={announceDialogOpen} onClose={handleCloseAnnounce} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: '#0f172a' }}>Add Announcement</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: '#0f172a' }}>
+          {editingAnnouncementId ? 'Edit Announcement' : 'Add Announcement'}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25, pt: 3 }}>
             <TextField
@@ -344,7 +387,7 @@ const Dashboard = () => {
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={handleCloseAnnounce}>Cancel</Button>
           <Button onClick={handleSubmitAnnounce} variant="contained" disabled={!announceForm.title || announceLoadingSubmit} sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, textTransform: 'none', fontWeight: 600 }}>
-            {announceLoadingSubmit ? 'Posting...' : 'Post Announcement'}
+            {announceLoadingSubmit ? 'Saving...' : editingAnnouncementId ? 'Save Changes' : 'Post Announcement'}
           </Button>
         </DialogActions>
       </Dialog>

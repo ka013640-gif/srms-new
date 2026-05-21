@@ -5,10 +5,11 @@ import { logActivity } from './activity.js';
 
 const router = express.Router();
 
-// GET /api/announcements — all authenticated users can view
+// GET /api/announcements — all authenticated users can view (only non-deleted)
 router.get('/', authenticate, async (req, res) => {
   try {
     const announcements = await prisma.announcement.findMany({
+      where: { deleted_at: null },
       orderBy: { created_at: 'desc' },
       take: 50
     });
@@ -54,8 +55,8 @@ router.post('/', authenticate, authorize('ADMIN', 'OFFICIAL'), async (req, res) 
   }
 });
 
-// PUT /api/announcements/:id — ADMIN only
-router.put('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
+// PUT /api/announcements/:id — ADMIN or OFFICIAL can edit
+router.put('/:id', authenticate, authorize('ADMIN', 'OFFICIAL'), async (req, res) => {
   try {
     const { title, content } = req.body;
     const announcement = await prisma.announcement.update({

@@ -7,7 +7,7 @@ const router = express.Router();
 // GET /api/archives - Get all archived entries (Admin only)
 router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const [residents, projects, sessions, officials, documentRequests] = await Promise.all([
+    const [residents, projects, sessions, officials, documentRequests, announcements] = await Promise.all([
       prisma.resident.findMany({
         where: { deleted_at: { not: null } },
         orderBy: { deleted_at: 'desc' }
@@ -28,6 +28,11 @@ router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
         where: { deleted_at: { not: null } },
         orderBy: { deleted_at: 'desc' },
         include: { user: { select: { fullName: true } } }
+      }),
+      prisma.announcement.findMany({
+        where: { deleted_at: { not: null } },
+        orderBy: { deleted_at: 'desc' },
+        include: { user: { select: { fullName: true } } }
       })
     ]);
 
@@ -36,7 +41,8 @@ router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
       ...projects.map(p => ({ ...p, entity_type: 'PROJECT' })),
       ...sessions.map(s => ({ ...s, entity_type: 'SESSION' })),
       ...officials.map(o => ({ ...o, entity_type: 'OFFICIAL' })),
-      ...documentRequests.map(d => ({ ...d, entity_type: 'DOCUMENT_REQUEST' }))
+      ...documentRequests.map(d => ({ ...d, entity_type: 'DOCUMENT_REQUEST' })),
+      ...announcements.map(a => ({ ...a, entity_type: 'ANNOUNCEMENT' }))
     ].sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
 
     res.json({ archives });
@@ -108,6 +114,18 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
       return res.json({ message: 'Document request restored successfully' });
     }
 
+    const announcement = await prisma.announcement.findFirst({ 
+      where: { announcement_id: parseInt(id), deleted_at: { not: null } } 
+    });
+
+    if (announcement) {
+      await prisma.announcement.update({
+        where: { announcement_id: parseInt(id) },
+        data: { deleted_at: null }
+      });
+      return res.json({ message: 'Announcement restored successfully' });
+    }
+
     return res.status(404).json({ error: 'Archive entry not found' });
   } catch (error) {
     console.error('Failed to restore entry:', error);
@@ -173,6 +191,17 @@ router.delete('/:id/permanent', authenticate, authorize('ADMIN'), async (req, re
         where: { document_request_id: parseInt(id) }
       });
       return res.json({ message: 'Document request permanently deleted' });
+    }
+
+    const announcement = await prisma.announcement.findFirst({ 
+      where: { announcement_id: parseInt(id), deleted_at: { not: null } } 
+    });
+
+    if (announcement) {
+      await prisma.announcement.delete({
+        where: { announcement_id: parseInt(id) }
+      });
+      return res.json({ message: 'Announcement permanently deleted' });
     }
 
     return res.status(404).json({ error: 'Archive entry not found' });
