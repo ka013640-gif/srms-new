@@ -19,7 +19,7 @@ function PrivateRoute({ children, adminOnly = false }) {
 
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (adminOnly && user.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
+  if (adminOnly && !['ADMIN', 'OFFICIAL'].includes(user.role)) return <Navigate to="/dashboard" replace />;
 
   return children;
 }

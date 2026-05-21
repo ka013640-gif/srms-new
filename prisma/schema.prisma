@@ -139,6 +139,7 @@ model ActivityLog {
 
 enum Role {
   ADMIN
+  OFFICIAL
   RESIDENT
 }
 

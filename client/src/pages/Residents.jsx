@@ -28,8 +28,10 @@ import {
 } from '@mui/material';
 import { Add, Edit, Delete, ArrowUpward, ArrowDownward } from '@mui/icons-material';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Residents = () => {
+  const { user } = useAuth();
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -302,24 +304,26 @@ const Residents = () => {
         <Typography variant="h4" fontWeight={600} color="#1e293b">
           Residents Database
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1.5 }}>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => handleOpen()}
-            sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
-          >
-            Add Resident
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={handleOpenAddAccount}
-            sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
-          >
-            Add Account
-          </Button>
-        </Box>
+        {user?.role === 'ADMIN' && (
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => handleOpen()}
+              sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
+            >
+              Add Resident
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={handleOpenAddAccount}
+              sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}
+            >
+              Add Account
+            </Button>
+          </Box>
+        )}
       </Box>
 
       <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>

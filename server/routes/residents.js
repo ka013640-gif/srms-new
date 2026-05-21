@@ -95,13 +95,13 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/residents (create) - Admin or self-only
+// POST /api/residents (create) - Admin or self-create
 router.post('/', authenticate, async (req, res) => {
   try {
     const { birthday, ...rest } = req.body;
 
-    // Residents may only create a profile for themselves
-    if (req.user.role !== 'ADMIN') {
+    // Residents and officials may only create a profile for themselves
+    if (!['ADMIN', 'OFFICIAL'].includes(req.user.role)) {
       const existing = await prisma.resident.findFirst({
         where: { user_id: req.user.id }
       });
@@ -143,7 +143,7 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     // Residents may only edit their own profile
-    if (req.user.role !== 'ADMIN') {
+    if (!['ADMIN', 'OFFICIAL'].includes(req.user.role)) {
       if (!existing.user_id || existing.user_id !== req.user.id) {
         return res.status(403).json({ error: 'Access denied' });
       }

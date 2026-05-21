@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import prisma from '../prisma.js';
 import { validate, loginValidation, registerValidation, createAccountValidation } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
+import { logActivity } from './activity.js';
 
 const router = express.Router();
 
@@ -139,7 +140,7 @@ router.post('/create-account', validate(createAccountValidation), async (req, re
 
     // Check email uniqueness (when provided)
     if (email) {
-      const existingEmail = await prisma.resident.findFirst({ where: { email: email.trim() } });
+      const existingEmail = await prisma.user.findFirst({ where: { email: email.trim() } });
       if (existingEmail) {
         return res.status(400).json({ error: 'Email is already in use' });
       }
