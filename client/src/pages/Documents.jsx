@@ -309,7 +309,7 @@ const Documents = () => {
             <Box sx={{mx:2,my:1,p:2,bgcolor:'#f8fafc',borderRadius:2,border:'1px solid #e2e8f0'}}>
 
               {/* ── Resident Attachments ── */}
-              <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{mb:1.5}}>Your Attachments</Typography>
+              <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{mb:1.5}}>Resident Attachments</Typography>
               {residentFiles.length === 0 ? (
                 <Typography variant="body2" color="#94a3b8">No files attached.</Typography>
               ) : (
