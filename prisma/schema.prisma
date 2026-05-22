@@ -37,7 +37,7 @@ model Resident {
   status       String    @default("Active")
   created_at   DateTime  @default(now())
   updated_at   DateTime  @updatedAt
-  user         User?     @relation(fields: [user_id], references: [user_id])
+  user         User?     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("residents")
 }
@@ -98,7 +98,7 @@ model DocumentRequest {
   response_file       String?
   response_comment    String?
   attachments         DocumentRequestAttachment[]
-  user                User                        @relation(fields: [user_id], references: [user_id])
+  user                User                        @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@index([user_id], map: "document_requests_user_id_fkey")
   @@map("document_requests")
@@ -125,7 +125,7 @@ model ActivityLog {
   details         String?
   ip_address      String?
   created_at      DateTime @default(now())
-  user            User     @relation(fields: [user_id], references: [user_id])
+  user            User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@index([user_id], map: "activity_log_user_id_fkey")
   @@map("activity_log")
@@ -138,7 +138,7 @@ model Announcement {
   user_id         Int
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
-  user            User     @relation(fields: [user_id], references: [user_id])
+  user            User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("announcements")
 }
