@@ -89,7 +89,7 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
                const { linked_user_id, linked_official_id, ...residentData } = entity_data;
                
                // Extract user_data if present (for user restoration only)
-               const userData = entity_data?.user_data;
+               const userData = residentData?.user_data;
                
                // Restore user first
                const user = await restoreUserIfNeeded(linked_user_id, residentData.full_name, userData);
@@ -136,7 +136,7 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
                const { linked_user_id, linked_resident_id, ...officialData } = entity_data;
                
                // Extract user_data if present (for user restoration only)
-               const userData = entity_data?.user_data;
+               const userData = officialData?.user_data;
                
                // Restore user first
                const user = await restoreUserIfNeeded(linked_user_id, officialData.name, userData);
