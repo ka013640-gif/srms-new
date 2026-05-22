@@ -85,7 +85,7 @@ router.get('/dashboard', async (req, res) => {
 router.get('/demographics', async (req, res) => {
   try {
     const residents = await prisma.resident.findMany({
-      where: { status: 'Active', deleted_at: null },
+      where: { status: 'Active' },
       select: { age: true }
     });
 
@@ -103,7 +103,7 @@ router.get('/demographics', async (req, res) => {
 router.get('/gender-demographics', async (req, res) => {
   try {
     const residents = await prisma.resident.findMany({
-      where: { status: 'Active', deleted_at: null },
+      where: { status: 'Active' },
       select: { gender: true }
     });
 

@@ -44,10 +44,10 @@ const Archives = () => {
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const handleRestore = async (id, entityType) => {
+  const handleRestore = async (archiveId) => {
     if (window.confirm('Are you sure you want to restore this entry?')) {
       try {
-        await api.post(`archives/${id}/restore`);
+        await api.post(`archives/${archiveId}/restore`);
         fetchArchives();
         showMessage('Entry restored successfully', 'info');
       } catch (error) {
@@ -57,10 +57,10 @@ const Archives = () => {
     }
   };
 
-  const handlePermanentDelete = async (id) => {
+  const handlePermanentDelete = async (archiveId) => {
     if (window.confirm('Are you sure you want to permanently delete this entry? This action cannot be undone.')) {
       try {
-        await api.delete(`archives/${id}/permanent`);
+        await api.delete(`archives/${archiveId}/permanent`);
         fetchArchives();
         showMessage('Entry permanently deleted', 'info');
       } catch (error) {
@@ -91,30 +91,29 @@ const Archives = () => {
   };
 
   const renderEntityDetails = (entry) => {
+    const data = entry.entity_data || {};
     switch (entry.entity_type) {
       case 'RESIDENT':
-        return entry.full_name;
+        return data.full_name || 'Unknown';
       case 'PROJECT':
-        return entry.name;
+        return data.name || 'Unknown';
       case 'SESSION':
-        return entry.title;
+        return data.title || 'Unknown';
       case 'OFFICIAL':
-        return entry.name;
+        return data.name || 'Unknown';
       case 'ANNOUNCEMENT':
         return (
           <Box>
-            <Typography variant="body2" fontWeight={600}>{entry.title}</Typography>
-            {entry.content && <Typography variant="caption" color="text.secondary" display="block">{entry.content}</Typography>}
-            <Typography variant="caption" color="text.secondary">by {entry.user?.fullName || 'Unknown'}</Typography>
+            <Typography variant="body2" fontWeight={600}>{data.title || 'Unknown'}</Typography>
+            {data.content && <Typography variant="caption" color="text.secondary" display="block">{data.content}</Typography>}
           </Box>
         );
       case 'DOCUMENT_REQUEST':
         return (
           <Box>
-            <Typography variant="body2" fontWeight={600}>{entry.type}</Typography>
-            <Typography variant="caption" color="text.secondary">by {entry.user?.fullName || 'Unknown'}</Typography>
-            {entry.purpose && (
-              <Typography variant="caption" color="text.secondary" display="block">Purpose: {entry.purpose}</Typography>
+            <Typography variant="body2" fontWeight={600}>{data.type || 'Unknown'}</Typography>
+            {data.purpose && (
+              <Typography variant="caption" color="text.secondary" display="block">Purpose: {data.purpose}</Typography>
             )}
           </Box>
         );
@@ -143,53 +142,40 @@ const Archives = () => {
             <TableRow>
               <TableCell>Entity Type</TableCell>
               <TableCell>Entity Details</TableCell>
-              <TableCell>Deleted At</TableCell>
+              <TableCell>Archived At</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-{archives.length === 0 ? (
-               <TableRow>
-                 <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
-                   No archived entries
-                 </TableCell>
-               </TableRow>
-             ) : (
-archives.map((entry) => {
-                  const entryId = entry.entity_type === 'RESIDENT' 
-                    ? entry.resident_id 
-                    : entry.entity_type === 'PROJECT' 
-                      ? entry.project_id 
-                      : entry.entity_type === 'SESSION' 
-                        ? entry.session_id 
-                        : entry.entity_type === 'OFFICIAL'
-                          ? entry.official_id
-                          : entry.entity_type === 'ANNOUNCEMENT'
-                            ? entry.announcement_id
-                            : entry.document_request_id;
-                  return (
-                   <TableRow key={`${entry.entity_type}-${entryId}`} hover>
-                     <TableCell>
-                       <Chip
-                         label={getEntityTypeLabel(entry.entity_type).label}
-                         color={getEntityTypeLabel(entry.entity_type).color}
-                         size="small"
-                       />
-                     </TableCell>
-                     <TableCell>{renderEntityDetails(entry)}</TableCell>
-                     <TableCell>{new Date(entry.deleted_at).toLocaleString()}</TableCell>
-                     <TableCell>
-                       <IconButton size="small" onClick={() => handleRestore(entryId, entry.entity_type)} color="primary">
-                         <Restore fontSize="small" />
-                       </IconButton>
-                       <IconButton size="small" onClick={() => handlePermanentDelete(entryId)} color="error">
-                         <DeleteForever fontSize="small" />
-                       </IconButton>
-                     </TableCell>
-                   </TableRow>
-                 );
-               })
-             )}
+            {archives.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
+                  No archived entries
+                </TableCell>
+              </TableRow>
+            ) : (
+              archives.map((entry) => (
+                <TableRow key={entry.archive_id} hover>
+                  <TableCell>
+                    <Chip
+                      label={getEntityTypeLabel(entry.entity_type).label}
+                      color={getEntityTypeLabel(entry.entity_type).color}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>{renderEntityDetails(entry)}</TableCell>
+                  <TableCell>{new Date(entry.created_at).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <IconButton size="small" onClick={() => handleRestore(entry.archive_id)} color="primary">
+                      <Restore fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handlePermanentDelete(entry.archive_id)} color="error">
+                      <DeleteForever fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

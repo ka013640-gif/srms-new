@@ -257,7 +257,7 @@ router.get('/me', authenticate, async (req, res) => {
       where: { user_id: req.user.id },
       select: {
         user_id: true, username: true, fullName: true,
-        role: true, email: true, profilePicture: true, created_at: true,
+        role: true, email: true, created_at: true,
         resident: {
           select: {
             resident_id: true, full_name: true, birthday: true,

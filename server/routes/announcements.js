@@ -5,11 +5,10 @@ import { logActivity } from './activity.js';
 
 const router = express.Router();
 
-// GET /api/announcements — all authenticated users can view (only non-deleted)
+// GET /api/announcements — all authenticated users can view
 router.get('/', authenticate, async (req, res) => {
   try {
     const announcements = await prisma.announcement.findMany({
-      where: { deleted_at: null },
       orderBy: { created_at: 'desc' },
       take: 50
     });
@@ -71,15 +70,36 @@ router.put('/:id', authenticate, authorize('ADMIN', 'OFFICIAL'), async (req, res
   }
 });
 
-// DELETE /api/announcements/:id — ADMIN only (soft delete)
+// DELETE /api/announcements/:id — ADMIN only (move to archives)
 router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    await prisma.announcement.update({
-      where: { announcement_id: parseInt(req.params.id) },
-      data: { deleted_at: new Date() }
+    const announcement = await prisma.announcement.findUnique({
+      where: { announcement_id: parseInt(req.params.id) }
     });
-    await logActivity(req.user.id, 'DELETE_ANNOUNCEMENT', { announcement_id: req.params.id }, req);
-    res.json({ message: 'Announcement deleted' });
+
+    if (!announcement) {
+      return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    const { announcement_id, ...announcementData } = announcement;
+    await prisma.archive.create({
+      data: {
+        title: announcement.title,
+        description: `Announcement record archived`,
+        category: 'ANNOUNCEMENT',
+        entity_type: 'ANNOUNCEMENT',
+        entity_id: announcement_id,
+        entity_data: announcementData,
+        archived_by: req.user.id
+      }
+    });
+
+    await prisma.announcement.delete({
+      where: { announcement_id: parseInt(req.params.id) }
+    });
+
+    await logActivity(req.user.id, 'DELETE_ANNOUNCEMENT', { announcement_id: announcement.announcement_id, title: announcement.title }, req);
+    res.json({ message: 'Announcement moved to archives' });
   } catch (error) {
     console.error('Failed to delete announcement:', error);
     res.status(500).json({ error: 'Failed to delete announcement' });

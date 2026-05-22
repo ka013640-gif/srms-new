@@ -10,8 +10,7 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const projects = await prisma.project.findMany({
-      orderBy: { created_at: 'desc' },
-      where: { deleted_at: null }
+      orderBy: { created_at: 'desc' }
     });
 
     res.json({ projects });
@@ -24,7 +23,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:project_id', authenticate, async (req, res) => {
   try {
     const project = await prisma.project.findUnique({
-      where: { project_id: parseInt(req.params.project_id), deleted_at: null }
+      where: { project_id: parseInt(req.params.project_id) }
     });
 
     if (!project) {
@@ -69,7 +68,7 @@ const project = await prisma.project.update({
   }
 });
 
-// DELETE /api/projects/:project_id (Admin only) - soft delete to archive
+// DELETE /api/projects/:project_id (Admin only) - move to archives
 router.delete('/:project_id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const project = await prisma.project.findUnique({
@@ -80,14 +79,26 @@ router.delete('/:project_id', authenticate, authorize('ADMIN'), async (req, res)
       return res.status(404).json({ error: 'Project not found' });
     }
 
-await prisma.project.update({
-       where: { project_id: parseInt(req.params.project_id) },
-       data: { deleted_at: new Date() }
-     });
+    const { project_id, ...projectData } = project;
+    await prisma.archive.create({
+      data: {
+        title: project.name,
+        description: `Project record archived`,
+        category: 'PROJECT',
+        entity_type: 'PROJECT',
+        entity_id: project_id,
+        entity_data: projectData,
+        archived_by: req.user.id
+      }
+    });
+
+    await prisma.project.delete({
+      where: { project_id: parseInt(req.params.project_id) }
+    });
 
     await logActivity(req.user.id, 'DELETE_PROJECT', { project_id: project.project_id, name: project.name }, req);
 
-     res.json({ message: 'Project moved to archives' });
+    res.json({ message: 'Project moved to archives' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete project' });
   }

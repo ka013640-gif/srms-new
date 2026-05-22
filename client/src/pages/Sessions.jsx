@@ -57,7 +57,6 @@ const Sessions = () => {
     date: '',
     time: '',
     location: '',
-    attendees: '',
     status: 'SCHEDULED'
   });
 
@@ -83,12 +82,11 @@ const Sessions = () => {
         date: session.date?.split('T')[0],
         time: session.time,
         location: session.location,
-        attendees: session.attendees || '',
         status: session.status || 'SCHEDULED'
       });
     } else {
       setEditing(null);
-      setFormData({ title: '', description: '', date: '', time: '', location: '', attendees: '', status: 'SCHEDULED' });
+      setFormData({ title: '', description: '', date: '', time: '', location: '', status: 'SCHEDULED' });
     }
     setOpen(true);
   };

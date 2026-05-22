@@ -10,10 +10,9 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
 
-    let where = { deleted_at: null };
+    let where = {};
     if (start_date && end_date) {
       where = {
-        deleted_at: null,
         date: {
           gte: new Date(start_date),
           lte: new Date(end_date)
@@ -23,11 +22,17 @@ router.get('/', authenticate, async (req, res) => {
 
     const sessions = await prisma.session.findMany({
       where,
-      orderBy: { date: 'desc' }
+      orderBy: { date: 'desc' },
+      select: {
+        session_id: true, title: true, description: true,
+        date: true, time: true, location: true, status: true,
+        created_at: true, updated_at: true
+      }
     });
 
     res.json({ sessions });
   } catch (error) {
+    console.error('Failed to fetch sessions:', error);
     res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
@@ -36,7 +41,12 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:session_id', authenticate, async (req, res) => {
   try {
     const session = await prisma.session.findUnique({
-      where: { session_id: parseInt(req.params.session_id), deleted_at: null }
+      where: { session_id: parseInt(req.params.session_id) },
+      select: {
+        session_id: true, title: true, description: true,
+        date: true, time: true, location: true, status: true,
+        created_at: true, updated_at: true
+      }
     });
 
     if (!session) {
@@ -53,19 +63,18 @@ router.get('/:session_id', authenticate, async (req, res) => {
 // POST /api/sessions (Admin only)
 router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const { title, description, date, time, location, attendees, status } = req.body;
+    const { attendees: _att, ...rest } = req.body;
 
-const session = await prisma.session.create({
-       data: {
-         title,
-         description,
-         date: new Date(date),
-         time,
-         location,
-         attendees: attendees ? JSON.stringify(attendees) : null,
-         status
-       }
-     });
+    const session = await prisma.session.create({
+      data: {
+        title: rest.title,
+        description: rest.description,
+        date: new Date(rest.date),
+        time: rest.time,
+        location: rest.location,
+        status: rest.status
+      }
+    });
 
     await logActivity(req.user.id, 'CREATE_SESSION', { session_id: session.session_id, title: session.title }, req);
 
@@ -79,13 +88,16 @@ const session = await prisma.session.create({
 // PUT /api/sessions/:session_id (Admin only)
 router.put('/:session_id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-const session = await prisma.session.update({
-       where: { session_id: parseInt(req.params.session_id) },
-       data: {
-         ...req.body,
-         date: req.body.date ? new Date(req.body.date) : undefined
-       }
-     });
+    // Strip stale/unsupported fields before forwarding to Prisma
+    const { attendees: _att, ...rest } = req.body;
+
+    const session = await prisma.session.update({
+      where: { session_id: parseInt(req.params.session_id) },
+      data: {
+        ...rest,
+        date: rest.date ? new Date(rest.date) : undefined
+      }
+    });
 
     await logActivity(req.user.id, 'UPDATE_SESSION', { session_id: session.session_id, title: session.title }, req);
 
@@ -95,7 +107,7 @@ const session = await prisma.session.update({
   }
 });
 
-// DELETE /api/sessions/:session_id (Admin only) - soft delete to archive
+// DELETE /api/sessions/:session_id (Admin only) - move to archives
 router.delete('/:session_id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const session = await prisma.session.findUnique({
@@ -106,14 +118,26 @@ router.delete('/:session_id', authenticate, authorize('ADMIN'), async (req, res)
       return res.status(404).json({ error: 'Session not found' });
     }
 
-await prisma.session.update({
-       where: { session_id: parseInt(req.params.session_id) },
-       data: { deleted_at: new Date() }
-     });
+    const { session_id, ...sessionData } = session;
+    await prisma.archive.create({
+      data: {
+        title: session.title,
+        description: `Session record archived`,
+        category: 'SESSION',
+        entity_type: 'SESSION',
+        entity_id: session_id,
+        entity_data: sessionData,
+        archived_by: req.user.id
+      }
+    });
+
+    await prisma.session.delete({
+      where: { session_id: parseInt(req.params.session_id) }
+    });
 
     await logActivity(req.user.id, 'DELETE_SESSION', { session_id: session.session_id, title: session.title }, req);
 
-     res.json({ message: 'Session moved to archives' });
+    res.json({ message: 'Session moved to archives' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete session' });
   }

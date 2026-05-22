@@ -33,7 +33,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { status, user_id, resident_id } = req.query;
 
-    let where = { deleted_at: null };
+    let where = {};
     if (status) where.status = status;
 
     // Accept both new user_id and backward-compat resident_id query params
@@ -47,12 +47,12 @@ router.get('/', authenticate, async (req, res) => {
       if (residentUser?.user_id) where.user_id = residentUser.user_id;
     }
 
-     // Residents can only see their own requests
-     if (req.user.role === 'RESIDENT') {
-       where.user_id = req.user.id;
-     }
+    // Residents can only see their own requests
+    if (req.user.role === 'RESIDENT') {
+      where.user_id = req.user.id;
+    }
 
-     const requests = await prisma.documentRequest.findMany({
+    const requests = await prisma.documentRequest.findMany({
       where,
       include: {
         user: { select: { fullName: true, username: true } },
@@ -77,7 +77,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const request = await prisma.documentRequest.findUnique({
-      where: { document_request_id: parseInt(req.params.id), deleted_at: null },
+      where: { document_request_id: parseInt(req.params.id) },
       include: {
         user: { select: { fullName: true, username: true } },
         attachments: {
@@ -92,13 +92,13 @@ router.get('/:id', authenticate, async (req, res) => {
       return;
     }
 
-     // Residents can only view their own
-     if (req.user.role === 'RESIDENT') {
-       if (request.user_id !== req.user.id) {
-         res.status(403).json({ error: 'Access denied' });
-         return;
-       }
-     }
+    // Residents can only view their own
+    if (req.user.role === 'RESIDENT') {
+      if (request.user_id !== req.user.id) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
+    }
 
     res.json({ request });
   } catch (error) {
@@ -124,37 +124,37 @@ router.post('/', authenticate, uploadMany.array('files', 10), async (req, res) =
 
     let userId;
 
-     if (req.user.role === 'ADMIN') {
-       userId = req.body.user_id || req.user.id;
-     } else {
-       userId = req.user.id;
-     }
+    if (req.user.role === 'ADMIN') {
+      userId = req.body.user_id || req.user.id;
+    } else {
+      userId = req.user.id;
+    }
 
-const request = await prisma.documentRequest.create({
-       data: {
-         user_id: userId,
-         type,
-         purpose,
-         file_path: files.length > 0 ? `/uploads/documents/${files[0].filename}` : null,
-         ...(files.length > 0 && {
-           attachments: {
-             create: files.map(f => ({
-               file_path: `/uploads/documents/${f.filename}`,
-               file_name: f.originalname,
-               is_admin: false
-             }))
-           }
-         })
-       },
-       include: {
-         user: { select: { fullName: true, username: true } },
-         attachments: true
-       }
-     });
+    const request = await prisma.documentRequest.create({
+      data: {
+        user_id: userId,
+        type,
+        purpose,
+        file_path: files.length > 0 ? `/uploads/documents/${files[0].filename}` : null,
+        ...(files.length > 0 && {
+          attachments: {
+            create: files.map(f => ({
+              file_path: `/uploads/documents/${f.filename}`,
+              file_name: f.originalname,
+              is_admin: false
+            }))
+          }
+        })
+      },
+      include: {
+        user: { select: { fullName: true, username: true } },
+        attachments: true
+      }
+    });
 
     await logActivity(req.user.id, 'CREATE_DOCUMENT_REQUEST', { document_request_id: request.document_request_id, type: request.type }, req);
 
-     res.status(201).json({ message: 'Request submitted', request });
+    res.status(201).json({ message: 'Request submitted', request });
   } catch (error) {
     console.error('Create document error:', error);
     res.status(500).json({ error: 'Failed to create request', details: error.message });
@@ -258,25 +258,25 @@ router.put('/:id/status', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Cannot modify a resolved request' });
     }
 
-const updated = await prisma.documentRequest.update({
-       where: { document_request_id: parseInt(req.params.id) },
-       data: {
-         status,
-         notes,
-         processed_at: new Date()
-       },
-       include: {
-         user: { select: { fullName: true, username: true } },
-         attachments: {
-           where: { is_deleted: false },
-           orderBy: { created_at: 'asc' }
-         }
-       }
-     });
+    const updated = await prisma.documentRequest.update({
+      where: { document_request_id: parseInt(req.params.id) },
+      data: {
+        status,
+        notes,
+        processed_at: new Date()
+      },
+      include: {
+        user: { select: { fullName: true, username: true } },
+        attachments: {
+          where: { is_deleted: false },
+          orderBy: { created_at: 'asc' }
+        }
+      }
+    });
 
     await logActivity(req.user.id, 'UPDATE_DOCUMENT_REQUEST', { document_request_id: updated.document_request_id, status: updated.status }, req);
 
-     res.json({ message: 'Request updated', request: updated });
+    res.json({ message: 'Request updated', request: updated });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update request' });
@@ -381,28 +381,48 @@ router.delete('/:id/response-file', authenticate, authorize('ADMIN'), async (req
 });
 
 // ============================================================
-// DELETE /api/documents/:id (Admin only - soft delete to archive)
+// DELETE /api/documents/:id (Admin only - move to archives)
 // ============================================================
 router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const requestId = parseInt(req.params.id);
 
     const request = await prisma.documentRequest.findUnique({
-      where: { document_request_id: requestId }
+      where: { document_request_id: requestId },
+      include: {
+        user: { select: { fullName: true } },
+        attachments: { where: { is_deleted: false } }
+      }
     });
 
     if (!request) {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-await prisma.documentRequest.update({
-       where: { document_request_id: requestId },
-       data: { deleted_at: new Date() }
-     });
+    const { document_request_id, ...requestData } = request;
+    await prisma.archive.create({
+      data: {
+        title: `Document Request: ${request.type}`,
+        description: `Document request archived`,
+        category: 'DOCUMENT_REQUEST',
+        entity_type: 'DOCUMENT_REQUEST',
+        entity_id: document_request_id,
+        entity_data: requestData,
+        archived_by: req.user.id
+      }
+    });
+
+    await prisma.documentRequestAttachment.deleteMany({
+      where: { document_request_id: requestId }
+    });
+
+    await prisma.documentRequest.delete({
+      where: { document_request_id: requestId }
+    });
 
     await logActivity(req.user.id, 'DELETE_DOCUMENT_REQUEST', { document_request_id: request.document_request_id, type: request.type }, req);
 
-     res.json({ message: 'Request moved to archives' });
+    res.json({ message: 'Request moved to archives' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to archive request' });

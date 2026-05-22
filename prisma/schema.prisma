@@ -14,7 +14,6 @@ model User {
   fullName       String
   role           Role              @default(RESIDENT)
   email          String?
-  profilePicture String?
   created_at     DateTime          @default(now())
   activityLog    ActivityLog[]
   announcements  Announcement[]
@@ -38,7 +37,6 @@ model Resident {
   status       String    @default("Active")
   created_at   DateTime  @default(now())
   updated_at   DateTime  @updatedAt
-  deleted_at   DateTime?
   user         User?     @relation(fields: [user_id], references: [user_id])
 
   @@map("residents")
@@ -53,7 +51,6 @@ model Official {
   term_end    DateTime?
   is_active   Boolean   @default(true)
   created_at  DateTime  @default(now())
-  deleted_at  DateTime?
 
   @@map("officials")
 }
@@ -68,7 +65,6 @@ model Project {
   end_date    DateTime?
   created_at  DateTime      @default(now())
   updated_at  DateTime      @updatedAt
-  deleted_at  DateTime?
 
   @@map("projects")
 }
@@ -80,11 +76,9 @@ model Session {
   date        DateTime
   time        String
   location    String
-  attendees   String?
   created_at  DateTime      @default(now())
   updated_at  DateTime      @updatedAt
   status      SessionStatus @default(SCHEDULED)
-  deleted_at  DateTime?
 
   @@map("sessions")
 }
@@ -103,7 +97,6 @@ model DocumentRequest {
   file_path           String?
   response_file       String?
   response_comment    String?
-  deleted_at          DateTime?
   attachments         DocumentRequestAttachment[]
   user                User                        @relation(fields: [user_id], references: [user_id])
 
@@ -145,10 +138,24 @@ model Announcement {
   user_id         Int
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
-  deleted_at      DateTime?
   user            User     @relation(fields: [user_id], references: [user_id])
 
   @@map("announcements")
+}
+
+model Archive {
+  archive_id    Int      @id @default(autoincrement())
+  title         String
+  description   String?
+  category      String
+  entity_type   String
+  entity_id     Int
+  entity_data   Json
+  file_path     String?
+  archived_by   Int
+  created_at    DateTime @default(now())
+
+  @@map("archives")
 }
 
 enum Role {

@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/stats', async (req, res) => {
   try {
     const active = await prisma.resident.count({
-      where: { status: 'Active', deleted_at: null }
+      where: { status: 'Active' }
     });
     res.json({ active });
   } catch (error) {
@@ -22,9 +22,9 @@ router.get('/stats', async (req, res) => {
 // GET /api/residents/stats/all (dashboard stats - admin only)
 router.get('/stats/all', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const total = await prisma.resident.count({ where: { deleted_at: null } });
+    const total = await prisma.resident.count();
     const active = await prisma.resident.count({
-      where: { status: 'Active', deleted_at: null }
+      where: { status: 'Active' }
     });
 
     res.json({ total, active });
@@ -51,10 +51,9 @@ router.get('/', authenticate, async (req, res) => {
         skip: parseInt(offset),
         take: parseInt(limit),
         orderBy,
-        where: { deleted_at: null },
         include: { user: { select: { username: true } } }
       }),
-      prisma.resident.count({ where: { deleted_at: null } })
+      prisma.resident.count()
     ]);
 
     res.json({
@@ -76,7 +75,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const resident = await prisma.resident.findUnique({
-      where: { resident_id: parseInt(req.params.id), deleted_at: null }
+      where: { resident_id: parseInt(req.params.id) }
     });
 
     if (!resident) {
@@ -234,14 +233,13 @@ router.put('/:id', authenticate, async (req, res) => {
         whereValue  = updated.full_name;
       }
 
-      // ── Step 3: run the UPDATE ───────────────────────────────────────
+// ── Step 3: run the UPDATE ───────────────────────────────────────
       await tx.$executeRawUnsafe(
         `UPDATE officials
            SET name      = COALESCE(?, name),
                contact   = COALESCE(?, contact),
                is_active = ?
-         WHERE ${whereClause}
-           AND deleted_at IS NULL`,
+         WHERE ${whereClause}`,
         nameChanged  ? updated.full_name  : null,
         contactChanged ? updated.contact   : null,
         is_active,
@@ -258,7 +256,7 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
-// DELETE /api/residents/:id - Admin only (soft delete to archive)
+// DELETE /api/residents/:id - Admin only (move to archives)
 router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const resident = await prisma.resident.findUnique({
@@ -269,9 +267,22 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
       return res.status(404).json({ error: 'Resident not found' });
     }
 
-    await prisma.resident.update({
-      where: { resident_id: parseInt(req.params.id) },
-      data: { deleted_at: new Date() }
+    // Convert to plain object for storage
+    const { resident_id, ...residentData } = resident;
+    await prisma.archive.create({
+      data: {
+        title: resident.full_name,
+        description: `Resident record archived`,
+        category: 'RESIDENT',
+        entity_type: 'RESIDENT',
+        entity_id: resident_id,
+        entity_data: residentData,
+        archived_by: req.user.id
+      }
+    });
+
+    await prisma.resident.delete({
+      where: { resident_id: parseInt(req.params.id) }
     });
 
     await logActivity(req.user.id, 'DELETE_RESIDENT', { resident_id: resident.resident_id, full_name: resident.full_name }, req);

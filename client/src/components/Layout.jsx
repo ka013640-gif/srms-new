@@ -180,7 +180,7 @@ const Layout = () => {
       {/* ══════════════════════════════════════════════════
           MAIN CONTENT
       ══════════════════════════════════════════════════ */}
-      <Box component="main" sx={{ ml: '260px', flex: 1, minHeight: '100vh' }}>
+      <Box component="main" sx={{ ml: '260px', flex: 1, minHeight: '100vh', px: 3, py: 2 }}>
         <Outlet />
       </Box>
 

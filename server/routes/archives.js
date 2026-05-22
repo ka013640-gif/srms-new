@@ -7,43 +7,9 @@ const router = express.Router();
 // GET /api/archives - Get all archived entries (Admin only)
 router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const [residents, projects, sessions, officials, documentRequests, announcements] = await Promise.all([
-      prisma.resident.findMany({
-        where: { deleted_at: { not: null } },
-        orderBy: { deleted_at: 'desc' }
-      }),
-      prisma.project.findMany({
-        where: { deleted_at: { not: null } },
-        orderBy: { deleted_at: 'desc' }
-      }),
-      prisma.session.findMany({
-        where: { deleted_at: { not: null } },
-        orderBy: { deleted_at: 'desc' }
-      }),
-      prisma.official.findMany({
-        where: { deleted_at: { not: null } },
-        orderBy: { deleted_at: 'desc' }
-      }),
-      prisma.documentRequest.findMany({
-        where: { deleted_at: { not: null } },
-        orderBy: { deleted_at: 'desc' },
-        include: { user: { select: { fullName: true } } }
-      }),
-      prisma.announcement.findMany({
-        where: { deleted_at: { not: null } },
-        orderBy: { deleted_at: 'desc' },
-        include: { user: { select: { fullName: true } } }
-      })
-    ]);
-
-    const archives = [
-      ...residents.map(r => ({ ...r, entity_type: 'RESIDENT' })),
-      ...projects.map(p => ({ ...p, entity_type: 'PROJECT' })),
-      ...sessions.map(s => ({ ...s, entity_type: 'SESSION' })),
-      ...officials.map(o => ({ ...o, entity_type: 'OFFICIAL' })),
-      ...documentRequests.map(d => ({ ...d, entity_type: 'DOCUMENT_REQUEST' })),
-      ...announcements.map(a => ({ ...a, entity_type: 'ANNOUNCEMENT' }))
-    ].sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+    const archives = await prisma.archive.findMany({
+      orderBy: { created_at: 'desc' }
+    });
 
     res.json({ archives });
   } catch (error) {
@@ -56,77 +22,44 @@ router.get('/', authenticate, authorize('ADMIN'), async (req, res) => {
 router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Find which table has this ID
-    const resident = await prisma.resident.findFirst({ 
-      where: { resident_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const project = await prisma.project.findFirst({ 
-      where: { project_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const session = await prisma.session.findFirst({ 
-      where: { session_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const official = await prisma.official.findFirst({ 
-      where: { official_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const documentRequest = await prisma.documentRequest.findFirst({ 
-      where: { document_request_id: parseInt(id), deleted_at: { not: null } } 
+    const archive = await prisma.archive.findUnique({
+      where: { archive_id: parseInt(id) }
     });
 
-    if (resident) {
-      await prisma.resident.update({
-        where: { resident_id: parseInt(id) },
-        data: { deleted_at: null }
-      });
-      return res.json({ message: 'Resident restored successfully' });
-    }
-    
-    if (project) {
-      await prisma.project.update({
-        where: { project_id: parseInt(id) },
-        data: { deleted_at: null }
-      });
-      return res.json({ message: 'Project restored successfully' });
-    }
-    
-    if (session) {
-      await prisma.session.update({
-        where: { session_id: parseInt(id) },
-        data: { deleted_at: null }
-      });
-      return res.json({ message: 'Session restored successfully' });
+    if (!archive) {
+      return res.status(404).json({ error: 'Archive entry not found' });
     }
 
-    if (official) {
-      await prisma.official.update({
-        where: { official_id: parseInt(id) },
-        data: { deleted_at: null }
-      });
-      return res.json({ message: 'Official restored successfully' });
+    const { entity_type, entity_data } = archive;
+
+    // Restore based on entity type
+    switch (entity_type) {
+      case 'RESIDENT':
+        await prisma.resident.create({ data: entity_data });
+        break;
+      case 'PROJECT':
+        await prisma.project.create({ data: entity_data });
+        break;
+      case 'SESSION':
+        await prisma.session.create({ data: entity_data });
+        break;
+      case 'OFFICIAL':
+        await prisma.official.create({ data: entity_data });
+        break;
+      case 'DOCUMENT_REQUEST':
+        await prisma.documentRequest.create({ data: entity_data });
+        break;
+      case 'ANNOUNCEMENT':
+        await prisma.announcement.create({ data: entity_data });
+        break;
+      default:
+        return res.status(400).json({ error: `Unknown entity type: ${entity_type}` });
     }
 
-    if (documentRequest) {
-      await prisma.documentRequest.update({
-        where: { document_request_id: parseInt(id) },
-        data: { deleted_at: null }
-      });
-      return res.json({ message: 'Document request restored successfully' });
-    }
+    // Delete from archives after successful restore
+    await prisma.archive.delete({ where: { archive_id: parseInt(id) } });
 
-    const announcement = await prisma.announcement.findFirst({ 
-      where: { announcement_id: parseInt(id), deleted_at: { not: null } } 
-    });
-
-    if (announcement) {
-      await prisma.announcement.update({
-        where: { announcement_id: parseInt(id) },
-        data: { deleted_at: null }
-      });
-      return res.json({ message: 'Announcement restored successfully' });
-    }
-
-    return res.status(404).json({ error: 'Archive entry not found' });
+    res.json({ message: `${entity_type.toLowerCase()} restored successfully` });
   } catch (error) {
     console.error('Failed to restore entry:', error);
     res.status(500).json({ error: 'Failed to restore entry' });
@@ -137,74 +70,19 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
 router.delete('/:id/permanent', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Find which table has this ID
-    const resident = await prisma.resident.findFirst({ 
-      where: { resident_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const project = await prisma.project.findFirst({ 
-      where: { project_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const session = await prisma.session.findFirst({ 
-      where: { session_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const official = await prisma.official.findFirst({ 
-      where: { official_id: parseInt(id), deleted_at: { not: null } } 
-    });
-    const documentRequest = await prisma.documentRequest.findFirst({ 
-      where: { document_request_id: parseInt(id), deleted_at: { not: null } } 
+    const archive = await prisma.archive.findUnique({
+      where: { archive_id: parseInt(id) }
     });
 
-    if (resident) {
-      await prisma.resident.delete({
-        where: { resident_id: parseInt(id) }
-      });
-      return res.json({ message: 'Resident permanently deleted' });
-    }
-    
-    if (project) {
-      await prisma.project.delete({
-        where: { project_id: parseInt(id) }
-      });
-      return res.json({ message: 'Project permanently deleted' });
-    }
-    
-    if (session) {
-      await prisma.session.delete({
-        where: { session_id: parseInt(id) }
-      });
-      return res.json({ message: 'Session permanently deleted' });
+    if (!archive) {
+      return res.status(404).json({ error: 'Archive entry not found' });
     }
 
-    if (official) {
-      await prisma.official.delete({
-        where: { official_id: parseInt(id) }
-      });
-      return res.json({ message: 'Official permanently deleted' });
-    }
-
-    if (documentRequest) {
-      await prisma.documentRequestAttachment.deleteMany({
-        where: { document_request_id: parseInt(id) }
-      });
-      await prisma.documentRequest.delete({
-        where: { document_request_id: parseInt(id) }
-      });
-      return res.json({ message: 'Document request permanently deleted' });
-    }
-
-    const announcement = await prisma.announcement.findFirst({ 
-      where: { announcement_id: parseInt(id), deleted_at: { not: null } } 
+    await prisma.archive.delete({
+      where: { archive_id: parseInt(id) }
     });
 
-    if (announcement) {
-      await prisma.announcement.delete({
-        where: { announcement_id: parseInt(id) }
-      });
-      return res.json({ message: 'Announcement permanently deleted' });
-    }
-
-    return res.status(404).json({ error: 'Archive entry not found' });
+    res.json({ message: 'Entry permanently deleted' });
   } catch (error) {
     console.error('Failed to permanently delete entry:', error);
     res.status(500).json({ error: 'Failed to permanently delete entry' });

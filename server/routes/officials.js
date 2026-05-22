@@ -9,8 +9,7 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const officials = await prisma.official.findMany({
-      orderBy: { created_at: 'desc' },
-      where: { deleted_at: null }
+      orderBy: { created_at: 'desc' }
     });
 
     res.json({ officials });
@@ -23,7 +22,7 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:official_id', authenticate, async (req, res) => {
   try {
     const official = await prisma.official.findUnique({
-      where: { official_id: parseInt(req.params.official_id), deleted_at: null }
+      where: { official_id: parseInt(req.params.official_id) }
     });
 
     if (!official) {
@@ -99,7 +98,6 @@ router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) =
               contact   = COALESCE(${official.contact}, contact),
               status    = COALESCE(${newStatus}, status)
           WHERE user_id = ${matchingUser.user_id}
-            AND deleted_at IS NULL
         `;
         syncRowsRes = res?.affectedRows ?? 0;
       } else {
@@ -110,7 +108,6 @@ router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) =
               contact   = COALESCE(${official.contact}, contact),
               status    = COALESCE(${newStatus}, status)
           WHERE LOWER(full_name) LIKE LOWER(CONCAT('%', ${official.name}, '%'))
-            AND deleted_at IS NULL
         `;
         syncRowsRes = res?.affectedRows ?? 0;
       }
@@ -129,7 +126,7 @@ router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) =
   }
 });
 
-// DELETE /api/officials/:official_id (Admin only) - soft delete to archive
+// DELETE /api/officials/:official_id (Admin only) - move to archives
 router.delete('/:official_id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const official = await prisma.official.findUnique({
@@ -140,14 +137,26 @@ router.delete('/:official_id', authenticate, authorize('ADMIN'), async (req, res
       return res.status(404).json({ error: 'Official not found' });
     }
 
-await prisma.official.update({
-       where: { official_id: parseInt(req.params.official_id) },
-       data: { deleted_at: new Date() }
-     });
+    const { official_id, ...officialData } = official;
+    await prisma.archive.create({
+      data: {
+        title: official.name,
+        description: `Official record archived`,
+        category: 'OFFICIAL',
+        entity_type: 'OFFICIAL',
+        entity_id: official_id,
+        entity_data: officialData,
+        archived_by: req.user.id
+      }
+    });
+
+    await prisma.official.delete({
+      where: { official_id: parseInt(req.params.official_id) }
+    });
 
     await logActivity(req.user.id, 'DELETE_OFFICIAL', { official_id: official.official_id, name: official.name }, req);
 
-     res.json({ message: 'Official moved to archives' });
+    res.json({ message: 'Official moved to archives' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to remove official' });
