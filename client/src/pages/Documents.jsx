@@ -299,13 +299,11 @@ const Documents = () => {
 
               {req.status === 'REJECTED' && (
                 <Box sx={{mt:2}}>
-                  {(req.response_comment || req.notes) ? (
+                  {req.response_comment || req.notes ? (
                     <Typography variant="body2" color="#dc2626" sx={{fontStyle:'italic'}}>
-                      Request was rejected: {req.response_comment || req.notes}
+                      {req.response_comment || req.notes}
                     </Typography>
-                  ) : (
-                    <Typography variant="body2" color="#dc2626" sx={{fontStyle:'italic'}}>Request was rejected — no response file was uploaded.</Typography>
-                  )}
+                  ) : null}
                 </Box>
               )}
 

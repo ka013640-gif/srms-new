@@ -189,11 +189,6 @@ router.post('/:id/upload', authenticate, async (req, res) => {
         return res.status(404).json({ error: 'Request not found' });
       }
 
-      // Admins cannot edit requests already released or rejected
-      if (existing.status === 'RELEASED' || existing.status === 'REJECTED') {
-        return res.status(400).json({ error: 'Cannot modify a resolved request' });
-      }
-
       const updated = await prisma.documentRequest.update({
         where: { document_request_id: requestId },
         data: {
@@ -240,10 +235,6 @@ router.post('/:id/upload', authenticate, async (req, res) => {
       });
       if (!existing) {
         return res.status(404).json({ error: 'Request not found' });
-      }
-
-      if (existing.status === 'RELEASED' || existing.status === 'REJECTED') {
-        return res.status(400).json({ error: 'Cannot modify a resolved request' });
       }
 
       if (files.length > 0) {
@@ -310,11 +301,6 @@ router.put('/:id/status', authenticate, async (req, res) => {
       if (status !== 'CANCELLED' || existing.status !== 'PENDING') {
         return res.status(400).json({ error: 'Residents can only cancel their own pending requests' });
       }
-    }
-
-    // Admins cannot edit requests already released or rejected
-    if (req.user.role === 'ADMIN' && (existing.status === 'RELEASED' || existing.status === 'REJECTED')) {
-      return res.status(400).json({ error: 'Cannot modify a resolved request' });
     }
 
     const updated = await prisma.documentRequest.update({
