@@ -297,16 +297,6 @@ const Documents = () => {
                 )
               )}
 
-              {req.status === 'REJECTED' && (
-                <Box sx={{mt:2}}>
-                  {req.response_comment || req.notes ? (
-                    <Typography variant="body2" color="#dc2626" sx={{fontStyle:'italic'}}>
-                      {req.response_comment || req.notes}
-                    </Typography>
-                  ) : null}
-                </Box>
-              )}
-
             </Box>
           </Collapse>
         </TableCell>
