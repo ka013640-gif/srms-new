@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logActivity } from './activity.js';
+import bcryptjs from 'bcryptjs';
 
 const router = express.Router();
 
@@ -41,6 +42,39 @@ router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { name, position, contact, term_start, term_end, is_active, user_id } = req.body;
 
+    let targetUserId = user_id;
+    
+    if (!targetUserId) {
+      // Try to find existing user by name match
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { fullName: name },
+            { username: name.toLowerCase().replace(/\s+/g, '_') }
+          ]
+        }
+      });
+      
+      if (existingUser) {
+        targetUserId = existingUser.user_id;
+      } else {
+        // Create new user for this official
+        const username = name.toLowerCase().replace(/\s+/g, '_');
+        const defaultPassword = 'official123';
+        const hashedPassword = await bcryptjs.hash(defaultPassword, 10);
+        
+        const newUser = await prisma.user.create({
+          data: {
+            username,
+            password: hashedPassword,
+            fullName: name,
+            role: 'OFFICIAL'
+          }
+        });
+        targetUserId = newUser.user_id;
+      }
+    }
+
     const official = await prisma.official.create({
       data: {
         name,
@@ -49,7 +83,7 @@ router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
         term_start: term_start ? new Date(term_start) : new Date(),
         term_end: term_end ? new Date(term_end) : null,
         is_active: is_active ?? true,
-        user_id: user_id || null
+        user_id: targetUserId
       }
     });
 
