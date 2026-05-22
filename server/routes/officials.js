@@ -153,8 +153,8 @@ router.delete('/:official_id', authenticate, authorize('ADMIN'), async (req, res
 
     // Use transaction to ensure atomicity
     await prisma.$transaction(async (tx) => {
-      // Archive the official
-      const { official_id, ...officialData } = official;
+      // Archive the official - exclude user_id to avoid FK issues on restore
+      const { official_id, user_id: offUserId, ...officialData } = official;
       await tx.archive.create({
         data: {
           title: official.name,
@@ -184,7 +184,7 @@ router.delete('/:official_id', authenticate, authorize('ADMIN'), async (req, res
         });
         
         if (residentExists) {
-          const { resident_id, ...residentData } = resident;
+          const { resident_id, user_id: resUserId, ...residentData } = resident;
           await tx.archive.create({
             data: {
               title: resident.full_name,
@@ -192,7 +192,11 @@ router.delete('/:official_id', authenticate, authorize('ADMIN'), async (req, res
               category: 'RESIDENT',
               entity_type: 'RESIDENT',
               entity_id: resident_id,
-              entity_data: residentData,
+              entity_data: {
+                ...residentData,
+                linked_user_id: user?.user_id,
+                linked_official_id: official.official_id
+              },
               archived_by: req.user.id
             }
           });

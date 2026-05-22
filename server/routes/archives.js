@@ -33,64 +33,80 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
     const { entity_type, entity_data } = archive;
 
       await prisma.$transaction(async (tx) => {
+        // Helper to restore user if needed
+        const restoreUserIfNeeded = async (linkedUserId, defaultName) => {
+          if (!linkedUserId) return null;
+          let user = await tx.user.findUnique({
+            where: { user_id: linkedUserId }
+          });
+          if (!user) {
+            user = await tx.user.create({
+              data: {
+                user_id: linkedUserId,
+                username: `restored_user_${linkedUserId}`,
+                password: '',
+                fullName: defaultName || 'Restored User',
+                role: 'RESIDENT'
+              }
+            });
+          }
+          return user;
+        };
+
+        // Helper to clean entity data - removes linked_* fields and timestamps
+        const cleanEntityData = (data, includeUserId = false) => {
+          const cleaned = { ...data };
+          delete cleaned.linked_user_id;
+          delete cleaned.linked_official_id;
+          delete cleaned.linked_resident_id;
+          delete cleaned.user_id;
+          delete cleaned.created_at;
+          delete cleaned.updated_at;
+          delete cleaned.deleted_at;
+          if (includeUserId) cleaned.user_id = undefined;
+          return cleaned;
+        };
+
         // Restore based on entity type
         switch (entity_type) {
            case 'RESIDENT': {
-             const { linked_user_id, linked_official_id, ...residentData } = entity_data;
-             
-             // Restore user if exists - check if user already exists first
-             let user = null;
-             if (linked_user_id) {
-               user = await tx.user.findUnique({
-                 where: { user_id: linked_user_id }
-               });
-               
-               if (!user) {
-                 user = await tx.user.create({
-                   data: {
-                     user_id: linked_user_id,
-                     username: `restored_user_${linked_user_id}`,
-                     password: '',
-                     fullName: residentData.full_name,
-                     role: 'RESIDENT'
-                   }
-                 });
-               }
-               
-               // Update resident with correct user_id
-               residentData.user_id = user.user_id;
-             }
-             
-             // Check if resident already exists with this user_id to avoid unique constraint violation
-             if (linked_user_id) {
-               const existingResident = await tx.resident.findFirst({
-                 where: { user_id: linked_user_id }
-               });
-               if (existingResident) {
-                 // If resident already exists, update it instead of creating new one
-                 await tx.resident.update({
-                   where: { resident_id: existingResident.resident_id },
-                   data: residentData
-                 });
-               } else {
-                 await tx.resident.create({ data: residentData });
-               }
-             } else {
-               await tx.resident.create({ data: residentData });
-             }
-             
-             // Restore linked official if exists
-             if (linked_official_id) {
-               const linkedOfficialEntry = await tx.archive.findFirst({
-                 where: { entity_type: 'OFFICIAL', entity_id: linked_official_id }
-               });
-               if (linkedOfficialEntry) {
-                 const { entity_data: officialData } = linkedOfficialEntry;
-                 await tx.official.create({ data: officialData });
-               }
-             }
-             break;
-           }
+              const { linked_user_id, linked_official_id, ...residentData } = entity_data;
+
+              // Restore user first
+              const user = await restoreUserIfNeeded(linked_user_id, residentData.full_name);
+
+              // Clean resident data
+              const residentClean = cleanEntityData(residentData);
+
+              // Restore resident
+              const existingResident = await tx.resident.findFirst({
+                where: { user_id: user?.user_id }
+              });
+              const restoredResident = existingResident
+                ? await tx.resident.update({ where: { resident_id: existingResident.resident_id }, data: residentClean })
+                : await tx.resident.create({ data: { ...residentClean, user_id: user?.user_id } });
+
+              // Restore linked official if exists - look up by entity_id (original official_id)
+              if (linked_official_id) {
+                const linkedOfficialEntry = await tx.archive.findFirst({
+                  where: { entity_type: 'OFFICIAL', entity_id: linked_official_id }
+                });
+                if (linkedOfficialEntry) {
+                  const { entity_data: officialData } = linkedOfficialEntry;
+                  const officialClean = cleanEntityData(officialData);
+
+                  const existingOfficial = await tx.official.findFirst({
+                    where: { user_id: user?.user_id }
+                  });
+                  if (existingOfficial) {
+                    await tx.official.update({ where: { official_id: existingOfficial.official_id }, data: officialClean });
+                  } else {
+                    await tx.official.create({ data: { ...officialClean, user_id: user?.user_id } });
+                  }
+                }
+              }
+              break;
+            }
         case 'PROJECT':
           await tx.project.create({ data: entity_data });
           break;
@@ -100,59 +116,41 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
             case 'OFFICIAL': {
               const { linked_user_id, linked_resident_id, ...officialData } = entity_data;
 
-              // Restore user if exists - check if user already exists first
-              let user = null;
-              if (linked_user_id) {
-                user = await tx.user.findUnique({
-                  where: { user_id: linked_user_id }
+              // Restore user first
+              const user = await restoreUserIfNeeded(linked_user_id, officialData.name);
+
+              // Clean official data
+              const officialClean = cleanEntityData(officialData);
+
+              // Restore official
+              const existingOfficial = await tx.official.findFirst({
+                where: { user_id: user?.user_id }
+              });
+              const restoredOfficial = existingOfficial
+                ? await tx.official.update({ where: { official_id: existingOfficial.official_id }, data: officialClean })
+                : await tx.official.create({ data: { ...officialClean, user_id: user?.user_id } });
+
+              // Restore linked resident if exists - look up by entity_id (original resident_id)
+              if (linked_resident_id) {
+                const linkedResidentEntry = await tx.archive.findFirst({
+                  where: { entity_type: 'RESIDENT', entity_id: linked_resident_id }
                 });
+                if (linkedResidentEntry) {
+                  const { entity_data: residentData } = linkedResidentEntry;
+                  const residentClean = cleanEntityData(residentData);
 
-                if (!user) {
-                  user = await tx.user.create({
-                    data: {
-                      user_id: linked_user_id,
-                      username: `restored_user_${linked_user_id}`,
-                      password: '',
-                      fullName: officialData.name,
-                      role: 'OFFICIAL'
-                    }
+                  const existingResident = await tx.resident.findFirst({
+                    where: { user_id: user?.user_id }
                   });
+                  if (existingResident) {
+                    await tx.resident.update({ where: { resident_id: existingResident.resident_id }, data: residentClean });
+                  } else {
+                    await tx.resident.create({ data: { ...residentClean, user_id: user?.user_id } });
+                  }
                 }
-
-                // Update official with correct name matching user
-                officialData.name = user.fullName;
-                officialData.user_id = user.user_id;
               }
-
-              // Check if official already exists by direct user_id FK
-              if (linked_user_id) {
-                const existingOfficial = await tx.official.findFirst({
-                  where: { user_id: linked_user_id }
-                });
-                if (existingOfficial) {
-                  await tx.official.update({
-                    where: { official_id: existingOfficial.official_id },
-                    data: officialData
-                  });
-                } else {
-                  await tx.official.create({ data: officialData });
-                }
-              } else {
-                await tx.official.create({ data: officialData });
-              }
-             
-             // Restore linked resident if exists
-             if (linked_resident_id) {
-               const linkedResidentEntry = await tx.archive.findFirst({
-                 where: { entity_type: 'RESIDENT', entity_id: linked_resident_id }
-               });
-               if (linkedResidentEntry) {
-                 const { entity_data: residentData } = linkedResidentEntry;
-                 await tx.resident.create({ data: residentData });
-               }
-             }
-             break;
-           }
+              break;
+            }
         case 'DOCUMENT_REQUEST':
           await tx.documentRequest.create({ data: entity_data });
           break;
@@ -161,16 +159,16 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
           break;
         default:
           return res.status(400).json({ error: `Unknown entity type: ${entity_type}` });
-      }
+        }
 
-      // Delete from archives after successful restore
-      await tx.archive.delete({ where: { archive_id: parseInt(id) } });
-    });
+        // Delete from archives after successful restore
+        await tx.archive.delete({ where: { archive_id: parseInt(id) } });
+      });
 
     res.json({ message: `${entity_type.toLowerCase()} restored successfully` });
   } catch (error) {
     console.error('Failed to restore entry:', error);
-    res.status(500).json({ error: 'Failed to restore entry' });
+    res.status(500).json({ error: 'Failed to restore entry', details: error.message });
   }
 });
 
