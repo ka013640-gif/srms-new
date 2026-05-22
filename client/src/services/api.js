@@ -7,6 +7,26 @@ const api = axios.create({
   withCredentials: true
 });
 
+// ── Cross-page refresh event bus ──────────────────────────────────────────
+// Used so Officials/Residents pages can ask each other to re-fetch
+// after a save, without each page needing to know the other's function.
+const refreshListeners = {
+  officials: new Set(),
+  residents: new Set()
+};
+function emitRefresh(kind) {
+  refreshListeners[kind].forEach(fn => fn());
+}
+function onRefresh(kind, fn) {
+  refreshListeners[kind].add(fn);
+  return () => refreshListeners[kind].delete(fn);
+}
+api.onRefreshOfficials = (fn) => onRefresh('officials', fn);
+api.onRefreshResidents = (fn) => onRefresh('residents', fn);
+api.emitRefreshOfficials = () => emitRefresh('officials');
+api.emitRefreshResidents = () => emitRefresh('residents');
+// ──────────────────────────────────────────────────────────────────────────
+
 // Request interceptor – add auth token; set JSON content-type only for non-FormData bodies
 api.interceptors.request.use(
   (config) => {

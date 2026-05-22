@@ -167,29 +167,34 @@ const Residents = () => {
   };
 
   const handleSubmit = async () => {
+    setError('');
+    const submitData = {
+      full_name: formData.full_name,
+      birthday: formData.birthday,
+      age: formData.age,
+      gender: formData.gender,
+      address: formData.address,
+      contact: formData.contact,
+      occupation: formData.occupation,
+      civil_status: formData.civil_status,
+      status: formData.status
+    };
     try {
-      setError('');
-      const submitData = {
-        full_name: formData.full_name,
-        birthday: formData.birthday,
-        age: formData.age,
-        gender: formData.gender,
-        address: formData.address,
-        contact: formData.contact,
-        occupation: formData.occupation,
-        civil_status: formData.civil_status,
-        status: formData.status
-      };
       if (editing) {
         await api.put(`residents/${editing.resident_id}`, submitData);
       } else {
         await api.post('residents', submitData);
       }
       handleClose();
-      fetchResidents();
+      // Re-fetch the Residents list so the edited row is current.
+      await fetchResidents();
+      // Tell the Officials page (if mounted) to refresh so the
+      // linked official record also reflects the save immediately.
+      api.emitRefreshOfficials();
     } catch (error) {
       console.error('Failed to save resident:', error);
       setError(error.response?.data?.error || 'Failed to save resident');
+      handleClose();
     }
   };
 
@@ -388,10 +393,14 @@ const Residents = () => {
                 hover
                 sx={{
                   '& td': { borderBottom: idx < residents.length - 1 ? '1px solid #f1f5f9' : 'none' },
-                  transition: 'background .12s',
+                  transition: 'background .12s, opacity .12s',
+                  opacity: resident.status === 'Active' ? 1 : 0.55,
                 }}
               >
-                <TableCell sx={{ color: '#1e293b', fontWeight: 500 }}>{resident.full_name}</TableCell>
+                <TableCell sx={{
+                  color: resident.status === 'Active' ? '#1e293b' : '#9ca3af',
+                  fontWeight: 500
+                }}>{resident.full_name}</TableCell>
                 <TableCell sx={{ color: '#475569' }}>{resident.age}</TableCell>
                 <TableCell sx={{ color: '#475569' }}>{resident.gender}</TableCell>
                 <TableCell>

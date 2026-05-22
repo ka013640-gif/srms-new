@@ -44,6 +44,9 @@ const Officials = () => {
 
   useEffect(() => {
     fetchOfficials();
+    const offRefresh = api.onRefreshOfficials(fetchOfficials);
+    const resRefresh = api.onRefreshResidents(fetchOfficials);
+    return () => { offRefresh(); resRefresh(); };
   }, []);
 
   const fetchOfficials = async () => {
@@ -96,8 +99,12 @@ const Officials = () => {
       }
       handleClose();
       fetchOfficials();
+      // Tell the Residents page (if mounted) to refresh so its
+      // table stays in sync without the user switching away.
+      api.emitRefreshResidents();
     } catch (error) {
       console.error('Failed to save official:', error);
+      handleClose();
     }
   };
 
@@ -179,7 +186,7 @@ const Officials = () => {
           <TableBody>
             {officials.map((official, idx) => (
               <TableRow
-                key={official.id}
+                key={official.official_id}
                 hover
                 sx={{
                   '& td': { borderBottom: idx < officials.length - 1 ? '1px solid #f1f5f9' : 'none' },
@@ -200,8 +207,8 @@ const Officials = () => {
                       fontWeight: 700,
                       fontSize: '11px',
                       letterSpacing: '.3px',
-                      bgcolor: official.is_active ? '#dcfce7' : '#f1f5f9',
-                      color: official.is_active ? '#16a34a' : '#64748b',
+                      bgcolor: official.is_active ? '#dcfce7' : '#fee2e2',
+                      color: official.is_active ? '#16a34a' : '#dc2626',
                     }}
                   />
                 </TableCell>

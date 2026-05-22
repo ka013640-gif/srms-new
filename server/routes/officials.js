@@ -67,21 +67,62 @@ router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) =
   try {
     const { name, position, contact, term_start, term_end, is_active } = req.body;
 
-const official = await prisma.official.update({
-       where: { official_id: parseInt(req.params.official_id) },
-       data: {
-         name,
-         position,
-         contact,
-         term_start: term_start ? new Date(term_start) : undefined,
-         term_end: term_end ? new Date(term_end) : undefined,
-         is_active
-       }
-     });
+    const official = await prisma.official.update({
+      where: { official_id: parseInt(req.params.official_id) },
+      data: {
+        name,
+        position,
+        contact,
+        term_start: term_start ? new Date(term_start) : undefined,
+        term_end: term_end ? new Date(term_end) : undefined,
+        is_active
+      }
+    });
 
-    await logActivity(req.user.id, 'UPDATE_OFFICIAL', { official_id: official.official_id, name: official.name }, req);
+    // ── Sync linked Resident ────────────────────────────────────────────────
+    // $executeRaw is a Prisma tag function — must be called with a
+    // tagged template literal.  Parameters embedded via ${} are
+    // safely parameterised by the Prisma engine.
+    let syncRowsRes = 0;
+    await prisma.$transaction(async (tx) => {
+      const newStatus = official.is_active ? 'Active' : 'Inactive';
 
-     res.json({ message: 'Official updated', official });
+      // 1. Resolve via User (exact name match in users table)
+      const matchingUser = await tx.user.findFirst({
+        where: { fullName: official.name }
+      });
+
+      if (matchingUser) {
+        const res = await tx.$executeRaw`
+          UPDATE residents
+          SET full_name = COALESCE(${official.name}, full_name),
+              contact   = COALESCE(${official.contact}, contact),
+              status    = COALESCE(${newStatus}, status)
+          WHERE user_id = ${matchingUser.user_id}
+            AND deleted_at IS NULL
+        `;
+        syncRowsRes = res?.affectedRows ?? 0;
+      } else {
+        // 2. Fallback: fuzzy match via LOWER / CONCAT
+        const res = await tx.$executeRaw`
+          UPDATE residents
+          SET full_name = COALESCE(${official.name}, full_name),
+              contact   = COALESCE(${official.contact}, contact),
+              status    = COALESCE(${newStatus}, status)
+          WHERE LOWER(full_name) LIKE LOWER(CONCAT('%', ${official.name}, '%'))
+            AND deleted_at IS NULL
+        `;
+        syncRowsRes = res?.affectedRows ?? 0;
+      }
+    });
+
+    await logActivity(req.user.id, 'UPDATE_OFFICIAL', { official_id: official.official_id, name: official.name, sync_rows: syncRowsRes }, req);
+
+    res.json({
+      message: 'Official updated',
+      official,
+      sync: { rows_affected: syncRowsRes }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update official' });

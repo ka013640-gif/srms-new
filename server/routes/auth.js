@@ -250,7 +250,7 @@ router.post('/create-account', authenticate, authorize('ADMIN'), validate(create
   }
 });
 
-// GET /api/auth/me — full profile (user + resident + optional official), any authenticated user
+    // GET /api/auth/me — full profile (user +resident + optional official), any authenticated user
 router.get('/me', authenticate, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -272,11 +272,16 @@ router.get('/me', authenticate, async (req, res) => {
 
     let response = { user };
     if (user.role === 'OFFICIAL') {
-      const official = await prisma.official.findFirst({
-        where: { name: user.fullName, deleted_at: null },
-        select: { official_id: true, position: true, term_start: true, term_end: true }
-      });
-      response.official = official || null;
+      // Tagged-template $executeRaw with ${} embeds Prisma auto-parameterisation.
+      const official = await prisma.$executeRaw`
+        SELECT official_id, name, position, contact, term_start, term_end,
+               is_active, created_at
+        FROM officials
+        WHERE LOWER(name) = LOWER(${user.fullName})
+          AND deleted_at IS NULL
+        LIMIT 1
+      `;
+      response.official = official[0] || null;
     }
 
     res.json(response);
