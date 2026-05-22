@@ -233,25 +233,34 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
       foundOfficial: official?.official_id
     });
 
-    // Use transaction to ensure atomicity
-    await prisma.$transaction(async (tx) => {
-      // Archive the resident - exclude user_id to avoid FK issues on restore
-      const { resident_id, user_id, ...residentData } = resident;
-      await tx.archive.create({
-        data: {
-          title: resident.full_name,
-          description: `Resident record archived`,
-          category: 'RESIDENT',
-          entity_type: 'RESIDENT',
-          entity_id: resident_id,
-          entity_data: {
-            ...residentData,
-            linked_user_id: user?.user_id,
-            linked_official_id: official?.official_id
-          },
-          archived_by: req.user.id
-        }
-      });
+     // Use transaction to ensure atomicity
+     await prisma.$transaction(async (tx) => {
+       // Archive the resident - exclude user_id to avoid FK issues on restore
+       const { resident_id, user_id, ...residentData } = resident;
+       // Archive linked user data if exists
+       const userData = user ? {
+         username: user.username,
+         password: user.password,
+         role: user.role,
+         fullName: user.fullName,
+         email: user.email
+       } : null;
+       await tx.archive.create({
+         data: {
+           title: resident.full_name,
+           description: `Resident record archived`,
+           category: 'RESIDENT',
+           entity_type: 'RESIDENT',
+           entity_id: resident_id,
+           entity_data: {
+             ...residentData,
+             linked_user_id: user?.user_id,
+             linked_official_id: official?.official_id,
+             ...(userData && { user_data: userData })
+           },
+           archived_by: req.user.id
+         }
+       });
 
       // Delete resident
       await tx.resident.delete({
