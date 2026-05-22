@@ -214,14 +214,14 @@ const Officials = () => {
                 </TableCell>
                 <TableCell>
                   {user?.role === 'ADMIN' ? (
-                    <>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <IconButton size="small" onClick={() => handleOpen(official)} sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9', color: '#1e293b' } }}>
                         <Edit fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => handleDelete(official.official_id)} color="error">
                         <Delete fontSize="small" />
                       </IconButton>
-                    </>
+                    </Box>
                   ) : (
                     '-'
                   )}

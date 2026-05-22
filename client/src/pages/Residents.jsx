@@ -11,6 +11,7 @@ import {
   TableRow,
   Button,
   IconButton,
+  InputAdornment,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -26,7 +27,7 @@ import {
   Grid,
   Pagination
 } from '@mui/material';
-import { Add, Edit, Delete, ArrowUpward, ArrowDownward } from '@mui/icons-material';
+import { Add, Edit, Delete, Visibility, VisibilityOff, ArrowUpward, ArrowDownward } from '@mui/icons-material';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -57,6 +58,14 @@ const Residents = () => {
   // Add Account dialog state
   const [addAccountOpen, setAddAccountOpen] = useState(false);
   const [accountCreateError, setAccountCreateError] = useState('');
+
+  // View More dialog state
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewPassword, setViewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [viewResident, setViewResident] = useState(null);
+  const [viewResidentUser, setViewResidentUser] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
 
   // Full account form state
   const calculateAge = (birthday) => {
@@ -213,6 +222,38 @@ const Residents = () => {
        }
      }
    };
+
+  // ── View More handler ──
+
+  const handleViewMore = async (resident) => {
+    if (!isAdmin) return;
+    setViewLoading(true);
+    setViewOpen(true);
+    setShowPassword(false);
+    try {
+      const { data } = await api.get(`residents/${resident.resident_id}`);
+      // API returns { resident: ... } or bare object
+      const r = data.resident || data;
+      setViewResident(r);
+      setViewPassword('');
+      if (r.user_id) {
+        const userRes = await api.get(`users/${r.user_id}`);
+        setViewResidentUser(userRes.data.user || userRes.data);
+        setViewPassword((userRes.data.user || userRes.data).password || '');
+      } else {
+        setViewResidentUser(null);
+        setViewPassword('');
+      }
+    } catch (err) {
+      console.error('Failed to fetch resident + user details:', err);
+      const r = resident.resident || resident;
+      setViewResident(r);
+      setViewResidentUser(null);
+      setViewPassword('');
+    } finally {
+      setViewLoading(false);
+    }
+  };
 
   // ── Add Account handlers ──
 
@@ -420,14 +461,17 @@ const Residents = () => {
                 <TableCell sx={{ color: '#64748b' }}>{resident.contact || '—'}</TableCell>
                 <TableCell>
                   {isAdmin ? (
-                    <>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <IconButton size="small" onClick={() => handleViewMore(resident)} sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9', color: '#1e293b' } }}>
+                        <Visibility fontSize="small" />
+                      </IconButton>
                       <IconButton size="small" onClick={() => handleOpen(resident)} sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9', color: '#1e293b' } }}>
                         <Edit fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => handleDelete(resident.resident_id)} color="error">
                         <Delete fontSize="small" />
                       </IconButton>
-                    </>
+                    </Box>
                   ) : (
                     '—'
                   )}
@@ -723,6 +767,123 @@ const Residents = () => {
           <Button onClick={handleAccountSubmit} variant="contained" sx={{ bgcolor: '#1e293b' }}>
             Create Account
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View More Dialog */}
+      <Dialog
+        open={viewOpen}
+        onClose={() => { setViewOpen(false); setShowPassword(false); }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>View Resident</DialogTitle>
+        <DialogContent>
+          {viewLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : viewResident ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+              <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', mb: 1.75 }}>
+                  Account Information
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Username"
+                      fullWidth
+                      value={viewResidentUser?.username || '—'}
+                      InputProps={{ readOnly: true }}
+                      sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Box sx={{ position: 'relative' }}>
+                      <TextField
+                        label="Password"
+                        fullWidth
+                        type={showPassword ? 'text' : 'password'}
+                        value={viewResidentUser ? viewPassword : '—'}
+                        InputProps={{
+                          readOnly: true,
+                          endAdornment: viewResidentUser ? (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                onClick={() => setShowPassword(!showPassword)}
+                                edge="end"
+                                sx={{ color: '#64748b', '&:hover': { bgcolor: '#e2e8f0' } }}
+                              >
+                                {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                              </IconButton>
+                            </InputAdornment>
+                          ) : null,
+                        }}
+                        sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Email"
+                      fullWidth
+                      value={viewResidentUser?.email || '—'}
+                      InputProps={{ readOnly: true }}
+                      sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Role"
+                      fullWidth
+                      value={viewResidentUser?.role || '—'}
+                      InputProps={{ readOnly: true }}
+                      sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+              <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', mb: 1.75 }}>
+                  Personal Information
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Full Name" fullWidth value={viewResident.full_name} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Gender" fullWidth value={viewResident.gender || '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField label="Age" fullWidth value={viewResident.age} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField label="Birthday" fullWidth value={viewResident.birthday ? new Date(viewResident.birthday).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : (viewResident.birthdate ? new Date(viewResident.birthdate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—')} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField label="Address" fullWidth value={viewResident.address || '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Contact" fullWidth value={viewResident.contact || '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Occupation" fullWidth value={viewResident.occupation || '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Civil Status" fullWidth value={viewResident.civil_status || '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField label="Status" fullWidth value={viewResident.status || '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f1f5f9', cursor: 'default' } }} />
+                  </Grid>
+                </Grid>
+              </Box>
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setViewOpen(false); setShowPassword(false); }}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

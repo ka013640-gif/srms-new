@@ -5,7 +5,6 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { logActivity } from './activity.js';
-
 const router = express.Router();
 
 const uploadDir = path.join(process.cwd(), 'uploads', 'documents');
@@ -162,64 +161,124 @@ router.post('/', authenticate, uploadMany.array('files', 10), async (req, res) =
 });
 
 // ============================================================
-// POST /api/documents/:id/upload  (admin adds 1+ attachments)
+// POST /api/documents/:id/upload  (admin responds — optional files)
 // ============================================================
-router.post('/:id/upload', authenticate, upload.array('files', 10), async (req, res) => {
-  try {
-    const requestId       = parseInt(req.params.id);
-    const responseComment = req.body.response_comment || '';
-    const rawStatus       = (req.body.status || '').trim().toUpperCase();
-    const files           = req.files || [];
+router.post('/:id/upload', authenticate, async (req, res) => {
+  const isMultipart = (req.headers['content-type'] || '').includes('multipart');
 
-    if (isNaN(requestId)) {
-      return res.status(400).json({ error: 'Invalid request ID' });
-    }
+  if (!isMultipart) {
+    // ── pure JSON: status + response_comment only, no files ──
+    try {
+      const requestId       = parseInt(req.params.id);
+      const responseComment = req.body.response_comment || '';
+      const rawStatus       = (req.body.status || 'APPROVED').trim().toUpperCase();
 
-    const validStatuses = ['PENDING','APPROVED','REJECTED','RELEASED','CANCELLED'];
-    const newStatus = validStatuses.includes(rawStatus) ? rawStatus : 'APPROVED';
-
-    const existing = await prisma.documentRequest.findUnique({
-      where: { document_request_id: requestId }
-    });
-    if (!existing) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-
-    // Persist attachment records + response_file (first file only)
-    if (files.length > 0) {
-      await prisma.documentRequestAttachment.createMany({
-        data: files.map(f => ({
-          document_request_id: requestId,
-          file_path:   `/uploads/documents/${f.filename}`,
-          file_name:   f.originalname,
-          is_admin:    true
-        }))
-      });
-    }
-
-    // Update status + comment (+ optional response_file from first file)
-    const updated = await prisma.documentRequest.update({
-      where: { document_request_id: requestId },
-      data: {
-        status:            newStatus,
-        response_file:     files.length > 0 ? `/uploads/documents/${files[0].filename}` : existing.response_file,
-        response_comment:  responseComment || (files.length === 0 ? null : existing.response_comment),
-        processed_at:      new Date()
-      },
-      include: {
-        user: { select: { fullName: true, username: true } },
-        attachments: { where: { is_deleted: false }, orderBy: { created_at: 'asc' } }
+      if (isNaN(requestId)) {
+        return res.status(400).json({ error: 'Invalid request ID' });
       }
-    });
 
-    res.status(201).json({ message: 'Response submitted', request: updated });
-  } catch (error) {
-    console.error('Admin upload error:', error);
-    res.status(500).json({
-      error: error.message || 'Failed to process admin response',
-      env:   process.env.NODE_ENV || 'development'
-    });
+      const validStatuses = ['PENDING','APPROVED','REJECTED','RELEASED','CANCELLED'];
+      if (!validStatuses.includes(rawStatus)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+
+      const existing = await prisma.documentRequest.findUnique({
+        where: { document_request_id: requestId }
+      });
+      if (!existing) {
+        return res.status(404).json({ error: 'Request not found' });
+      }
+
+      // Admins cannot edit requests already released or rejected
+      if (existing.status === 'RELEASED' || existing.status === 'REJECTED') {
+        return res.status(400).json({ error: 'Cannot modify a resolved request' });
+      }
+
+      const updated = await prisma.documentRequest.update({
+        where: { document_request_id: requestId },
+        data: {
+          status:            rawStatus,
+          response_file:     existing.response_file,
+          response_comment:  responseComment,
+          processed_at:      new Date()
+        },
+        include: {
+          user: { select: { fullName: true, username: true } },
+          attachments: { where: { is_deleted: false }, orderBy: { created_at: 'asc' } }
+        }
+      });
+
+      await logActivity(req.user.id, 'UPDATE_DOCUMENT_REQUEST', { document_request_id: updated.document_request_id, status: updated.status }, req);
+
+      res.status(201).json({ message: 'Response submitted', request: updated });
+    } catch (error) {
+      console.error('Admin JSON submit error:', error);
+      res.status(500).json({ error: error.message || 'Failed to submit response' });
+    }
+    return;
   }
+
+  // ── multipart: files + optional status/comment ──
+  upload.array('files', 10)(req, res, async () => {
+    try {
+      const requestId       = parseInt(req.params.id);
+      const responseComment = req.body.response_comment || '';
+      const rawStatus       = (req.body.status || 'APPROVED').trim().toUpperCase();
+      const files           = req.files || [];
+
+      if (isNaN(requestId)) {
+        return res.status(400).json({ error: 'Invalid request ID' });
+      }
+
+      const validStatuses = ['PENDING','APPROVED','REJECTED','RELEASED','CANCELLED'];
+      if (!validStatuses.includes(rawStatus)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+
+      const existing = await prisma.documentRequest.findUnique({
+        where: { document_request_id: requestId }
+      });
+      if (!existing) {
+        return res.status(404).json({ error: 'Request not found' });
+      }
+
+      if (existing.status === 'RELEASED' || existing.status === 'REJECTED') {
+        return res.status(400).json({ error: 'Cannot modify a resolved request' });
+      }
+
+      if (files.length > 0) {
+        await prisma.documentRequestAttachment.createMany({
+          data: files.map(f => ({
+            document_request_id: requestId,
+            file_path:   `/uploads/documents/${f.filename}`,
+            file_name:   f.originalname,
+            is_admin:    true
+          }))
+        });
+      }
+
+      const updated = await prisma.documentRequest.update({
+        where: { document_request_id: requestId },
+        data: {
+          status:            rawStatus,
+          response_file:     files.length > 0 ? `/uploads/documents/${files[0].filename}` : existing.response_file,
+          response_comment:  responseComment !== undefined ? responseComment : existing.response_comment,
+          processed_at:      new Date()
+        },
+        include: {
+          user: { select: { fullName: true, username: true } },
+          attachments: { where: { is_deleted: false }, orderBy: { created_at: 'asc' } }
+        }
+      });
+
+      await logActivity(req.user.id, 'UPDATE_DOCUMENT_REQUEST', { document_request_id: updated.document_request_id, status: updated.status }, req);
+
+      res.status(201).json({ message: 'Response submitted', request: updated });
+    } catch (error) {
+      console.error('Admin multipart submit error:', error);
+      res.status(500).json({ error: error.message || 'Failed to submit response' });
+    }
+  });
 });
 
 // ============================================================

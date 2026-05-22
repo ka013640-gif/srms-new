@@ -92,7 +92,7 @@ model DocumentRequest {
   document_request_id Int                         @id @default(autoincrement())
   user_id             Int
   type                String
-  purpose             String
+  purpose             String            @db.Text
   request_date        DateTime                    @default(now())
   status              RequestStatus               @default(PENDING)
   processed_by        Int?

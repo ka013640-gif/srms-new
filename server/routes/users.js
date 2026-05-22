@@ -120,6 +120,8 @@ router.get('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
       select: {
         user_id: true,
         username: true,
+        password: true,
+        email: true,
         fullName: true,
         role: true,
         created_at: true

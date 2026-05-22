@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FormControl, InputLabel, Select, MenuItem,
   Typography, Box, Paper, Table, TableBody, TableCell,
@@ -9,7 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import {
   Add, Close, ExpandMore, ExpandLess, Description,
-  Download, FileUpload, CheckCircle, Cancel as CancelIcon,
+  Download, CheckCircle, Cancel as CancelIcon,
   Send as SendIcon, Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
@@ -104,8 +104,8 @@ const Documents = () => {
     if (req.status === 'PENDING' || req.status === 'CANCELLED') {
       return (
         <>
-          <Button size="small" variant="contained" startIcon={<FileUpload fontSize="inherit" />} onClick={() => setUploadingAdminFor(req.document_request_id)} sx={{ bgcolor:'#16a34a','&:hover':{bgcolor:'#15803d'}, mr:0.5 }}>
-            Respond & Approve
+          <Button size="small" variant="contained" startIcon={<SendIcon fontSize="inherit" />} onClick={() => setUploadingAdminFor(req.document_request_id)} sx={{ bgcolor:'#16a34a','&:hover':{bgcolor:'#15803d'}, mr:0.5 }}>
+            Respond
           </Button>
           <Button size="small" variant="outlined" onClick={() => handleRejectOpen(req)} color="error">Reject</Button>
           <IconButton size="small" onClick={() => handleDelete(req.document_request_id)} color="error" title="Archive request" sx={{ml:0.5}}>
@@ -134,169 +134,85 @@ const Documents = () => {
     return <Typography variant="body2" color="#64748b">{req.status}</Typography>;
   };
 
-   // ── Admin Upload Panel — self-contained, owns file queue + send logic ──
-  const AdminUploadPanel = ({ requestId }) => {
-    const [comment, setComment]       = useState('');
-    const [status, setStatus]         = useState('APPROVED');
-    const [uploading, setUploading]   = useState(false);
-    const [queue, setQueue]           = useState([]);
-    const pickerRef                   = useRef(null);
+   // ── Admin Status/Comment Panel — resident cannot attach files ──
+   const AdminStatusPanel = ({ requestId }) => {
+     const [comment, setComment]    = useState('');
+     const [status, setStatus]      = useState('APPROVED');
+     const [submitting, setSubmitting] = useState(false);
 
-    const statusOptions = [
-      { value: 'PENDING',   label: 'Pending',       color: 'warning' },
-      { value: 'APPROVED',  label: 'Approved',      color: 'success' },
-      { value: 'REJECTED',  label: 'Rejected',      color: 'error'   },
-      { value: 'RELEASED',  label: 'Released',      color: 'info'    },
-      { value: 'CANCELLED', label: 'Cancelled',     color: 'default' },
-    ];
+     const statusOptions = [
+       { value: 'PENDING',   label: 'Pending',       color: 'warning' },
+       { value: 'APPROVED',  label: 'Approved',      color: 'success' },
+       { value: 'REJECTED',  label: 'Rejected',      color: 'error'   },
+       { value: 'RELEASED',  label: 'Released',      color: 'info'    },
+       { value: 'CANCELLED', label: 'Cancelled',     color: 'default' },
+     ];
 
-    const addFiles = useCallback((fList) => {
-      const entries = [...fList].map(f => ({
-        uid:   Math.random().toString(36).slice(2),
-        file:  f,
-        label: f.name
-      }));
-      setQueue(prev => [...prev, ...entries]);
-    }, []);
+     const handleCancel = useCallback(() => { setUploadingAdminFor(null); }, []);
 
-    const removeFromQueue = useCallback((uid) => {
-      setQueue(prev => prev.filter(e => e.uid !== uid));
-    }, []);
+     const handleSubmit = useCallback(async () => {
+       setSubmitting(true);
+       try {
+         const { data } = await api.post(`documents/${requestId}/upload`, {
+           status:           status,
+           response_comment: comment.trim()
+         });
+         alert('success', 'Status updated successfully.');
+         fetchRequests();
+         setUploadingAdminFor(null);
+       } catch (e) {
+         alert('error', e.response?.data?.error || 'Failed to update status');
+       } finally {
+         setSubmitting(false);
+       }
+     }, [status, comment, requestId]);
 
-    const doPick = useCallback(() => {
-      setTimeout(() => { pickerRef.current?.click(); }, 0);
-    }, []);
+     useEffect(() => {
+       if (requestId == null) { setComment(''); setStatus('APPROVED'); }
+     }, [requestId]);
 
-    const handleChange = useCallback((e) => {
-      addFiles(Array.from(e.target.files || []));
-    }, [addFiles]);
+     return (
+       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1.5 }}>
 
-    const handleCancel = useCallback(() => { setUploadingAdminFor(null); }, []);
+         <TextField
+           fullWidth
+           label="Response (optional)"
+           value={comment}
+           onChange={(e) => setComment(e.target.value)}
+           placeholder="Add a note for the resident…"
+           multiline rows={2}
+           size="small"
+         />
 
-    const handleSubmit = useCallback(async () => {
-      console.log('[Docs] Submitting response', { status, comment: comment.trim(), fileCount: queue.length });
-      setUploading(true);
-      try {
-        const fd = new FormData();
-        fd.append('status',           status);
-        fd.append('response_comment', comment.trim());
-        queue.forEach(q => fd.append('files', q.file));
-        const { data } = await api.post(`documents/${requestId}/upload`, fd);
-        console.log('[Docs] Server response:', data);
-        alert('success', 'Response submitted — request updated.');
-        fetchRequests();
-        setUploadingAdminFor(null);
-      } catch (e) {
-        const msg = e.response?.data?.error || e.message || 'Failed to submit response';
-        console.error('[Docs] Submit failed:', msg, e.response?.data);
-        alert('error', msg);
-      } finally {
-        setUploading(false);
-      }
-    }, [status, comment, queue, requestId]);
+         <FormControl size="small" sx={{ minWidth: 140 }}>
+           <InputLabel>Status</InputLabel>
+           <Select
+             value={status}
+             label="Status"
+             onChange={(e) => setStatus(e.target.value)}
+           >
+             {statusOptions.map(o => (
+               <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+             ))}
+           </Select>
+         </FormControl>
 
-    const handleKeyDown = useCallback((e) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
-    }, [handleSubmit]);
-
-    useEffect(() => {
-      if (requestId == null) { setComment(''); setQueue([]); }
-    }, [requestId]);
-
-    return (
-      <Box sx={{display:'flex',flexDirection:'column',gap:1.5,mt:1.5}}>
-
-        {/* ── Comment field (Enter closes panel, Shift+Enter = newline) ── */}
-        <TextField
-          fullWidth
-          label="Comment  (optional)"
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Add a note for the resident before attaching response files…"
-          multiline rows={2}
-          size="small"
-        />
-
-        {/* ── Status selector ── */}
-        <Box sx={{display:'flex',gap:1,alignItems:'center'}}>
-          <FormControl size="small" sx={{minWidth:140}}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={status}
-              label="Status"
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              {statusOptions.map(o => (
-                <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-
-        {/* ── Queued files queue ── */}
-        {queue.length > 0 && (
-          <Box sx={{display:'flex',flexDirection:'column',gap:0.5}}>
-            {queue.map(item => (
-              <Box key={item.uid} sx={{
-                display:'flex',alignItems:'center',justifyContent:'space-between',
-                px:1.5,py:0.75,borderRadius:1,bgcolor:'#f0fdf4',border:'1px solid #bbf7d0'
-              }}>
-                <Box sx={{display:'flex',alignItems:'center',gap:0.75,flex:1,minWidth:0}}>
-                  <Description fontSize="small" sx={{color:'#166534',flexShrink:0}} />
-                  <Typography variant="body2" noWrap sx={{color:'#166534',flex:1}}>
-                    {item.label}
-                  </Typography>
-                  <Chip icon={<CheckCircle />} label="Queued" size="small"
-                    sx={{bgcolor:'#dcfce7',color:'#166534',height:20,fontSize:'0.6rem','& .MuiChip-icon':{fontSize:'0.85rem'} }} />
-                </Box>
-                <IconButton size="small" onClick={() => removeFromQueue(item.uid)} title="Remove file"
-                  sx={{color:'#dc2626',ml:0.5,flexShrink:0}}>
-                  <CancelIcon fontSize="inherit" />
-                </IconButton>
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        {/* ── Pick button ── */}
-        <Button
-          variant="outlined"
-          startIcon={<Description fontSize="inherit" />}
-          onClick={doPick}
-          sx={{borderColor:'#94a3b8',color:'#475569','&:hover':{bgcolor:'#f8fafc',borderColor:'#64748b'},textTransform:'none',alignSelf:'flex-start'}}
-        >
-          {queue.length > 0 ? `+ Add More Files  (${queue.length} queued)` : 'Attach Files  (optional)'}
-        </Button>
-
-        {/* ── Submit / Cancel ── */}
-        <Box sx={{display:'flex',gap:1,pt:0.5,alignItems:'center'}}>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={uploading}
-            startIcon={uploading ? <CircularProgress size={14} color="inherit" /> : <SendIcon fontSize="inherit" />}
-            sx={{bgcolor:'#1e293b','&:hover':{bgcolor:'#334155'},textTransform:'none','&:disabled':{bgcolor:'#cbd5e1'}}}
-          >
-            {uploading ? 'Sending…' : 'Send & Approve'}
-          </Button>
-
-          <Button size="small" onClick={handleCancel} sx={{textTransform:'none',color:'#64748b'}}>Cancel</Button>
-        </Box>
-
-        <input
-          ref={pickerRef}
-          key={queue.length}
-          type="file"
-          hidden
-          multiple
-          accept="*/*"
-          onChange={handleChange}
-        />
-      </Box>
-    );
-  };
+         <Box sx={{ display: 'flex', gap: 1, pt: 0.5, alignItems: 'center' }}>
+           <Button
+             size="small"
+             variant="contained"
+             onClick={handleSubmit}
+             disabled={submitting}
+             startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : <SendIcon fontSize="inherit" />}
+             sx={{ bgcolor: '#1e293b','&:hover':{ bgcolor:'#334155' }, textTransform: 'none','&:disabled':{ bgcolor:'#cbd5e1' } }}
+           >
+             {submitting ? 'Saving…' : 'Submit Response'}
+           </Button>
+           <Button size="small" onClick={handleCancel} sx={{ textTransform: 'none', color: '#64748b' }}>Cancel</Button>
+         </Box>
+       </Box>
+     );
+   };
 
   const ExpandedDrawer = ({ req }) => {
     const residentFiles = (req.attachments || []).filter(a => !a.is_admin && !a.is_deleted);
@@ -304,39 +220,35 @@ const Documents = () => {
     const isOwner       = !isAdmin && req.user_id === user?.user_id;
     return (
       <TableRow key={`${req.document_request_id}-drawer`}>
-        <TableCell colSpan={6} sx={{p:0,border:'none'}}>
+        <TableCell colSpan={5} sx={{p:0,border:'none'}}>
           <Collapse in timeout="auto" unmountOnExit>
-            <Box sx={{mx:2,my:1,p:2,bgcolor:'#f8fafc',borderRadius:2,border:'1px solid #e2e8f0'}}>
+                <Box sx={{mx:2,my:1,p:2,bgcolor:'#f8fafc',borderRadius:2,border:'1px solid #e2e8f0'}}>
 
-              {/* ── Resident Attachments ── */}
-              <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{mb:1.5}}>Resident Attachments</Typography>
-              {residentFiles.length === 0 ? (
-                <Typography variant="body2" color="#94a3b8">No files attached.</Typography>
-              ) : (
-                <Box sx={{display:'flex',flexDirection:'column',gap:1}}>
-                  {residentFiles.map(f => (
-                    <Box key={f.document_request_attachment_id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',px:2,py:1,borderRadius:1,bgcolor:'#fff',border:'1px solid #e2e8f0'}}>
-                      <Button size="small" component="a" href={fileLink(f.file_path)} target="_blank" rel="noopener noreferrer"
-                        startIcon={isViewableFile(f.file_name) ? <Description fontSize="inherit" /> : <Download fontSize="inherit" />}
-                        sx={{justifyContent:'flex-start',textTransform:'none',color:'#1e293b','&:hover':{bgcolor:'transparent',textDecoration:'underline'}}}>
-                        {f.file_name}
-                      </Button>
-                      {isAdmin ? <Chip label="Resident" size="small" sx={{height:22,fontSize:'0.65rem'}} /> :
-                        isOwner && <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon fontSize="inherit"/>} onClick={() => handleDeleteAttachment(req.document_request_id, f.document_request_attachment_id)} sx={{fontSize:'0.75rem'}}>Remove</Button>}
-                    </Box>
-                  ))}
-                </Box>
-              )}
+                {/* ── Resident Purpose ── */}
+                <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{mb:1}}>Resident Purpose</Typography>
+                <Typography variant="body2" color="#475569" sx={{fontStyle:'italic',mb:2}}>{req.purpose}</Typography>
 
-              {isAdmin && (
-                <>
-                  <Divider sx={{my:2}} />
-                  <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{mb:1}}>Resident Purpose</Typography>
-                  <Typography variant="body2" color="#475569" sx={{fontStyle:'italic',mb:0.5}}>{req.purpose}</Typography>
-                </>
-              )}
+                {/* ── Resident Attachments ── */}
+                <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{mb:1.5}}>Resident Attachments</Typography>
+                {residentFiles.length === 0 ? (
+                  <Typography variant="body2" color="#94a3b8">No files attached.</Typography>
+                ) : (
+                  <Box sx={{display:'flex',flexDirection:'column',gap:1}}>
+                    {residentFiles.map(f => (
+                      <Box key={f.document_request_attachment_id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',px:2,py:1,borderRadius:1,bgcolor:'#fff',border:'1px solid #e2e8f0'}}>
+                        <Button size="small" component="a" href={fileLink(f.file_path)} target="_blank" rel="noopener noreferrer"
+                          startIcon={isViewableFile(f.file_name) ? <Description fontSize="inherit" /> : <Download fontSize="inherit" />}
+                          sx={{justifyContent:'flex-start',textTransform:'none',color:'#1e293b','&:hover':{bgcolor:'transparent',textDecoration:'underline'}}}>
+                          {f.file_name}
+                        </Button>
+                        {isAdmin ? <Chip label="Resident" size="small" sx={{height:22,fontSize:'0.65rem'}} /> :
+                          isOwner && <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon fontSize="inherit"/>} onClick={() => handleDeleteAttachment(req.document_request_id, f.document_request_attachment_id)} sx={{fontSize:'0.75rem'}}>Remove</Button>}
+                      </Box>
+                    ))}
+                  </Box>
+                )}
 
-              <Divider sx={{my:2}} />
+                <Divider sx={{my:2}} />
 
               {/* ── Admin Response ── */}
               {(req.response_file || req.response_comment) ? (
@@ -370,43 +282,19 @@ const Documents = () => {
                   )}
 
                   {isAdmin && uploadingAdminFor === req.document_request_id ? (
-                    <Box sx={{mt:1.5}}><AdminUploadPanel requestId={req.document_request_id} /></Box>
+                    <Box sx={{mt:1.5}}><AdminStatusPanel requestId={req.document_request_id} /></Box>
                   ) : isAdmin && uploadingAdminFor !== req.document_request_id && (
-                    <Button size="small" variant="outlined" startIcon={<FileUpload fontSize="inherit" />} onClick={() => setUploadingAdminFor(req.document_request_id)} sx={{borderColor:'#166534',color:'#166534','&:hover':{bgcolor:'#f0fdf4'},textTransform:'none',mt:1}}>Upload Response</Button>
+                    <Button size="small" variant="outlined" startIcon={<SendIcon fontSize="inherit" />} onClick={() => setUploadingAdminFor(req.document_request_id)} sx={{borderColor:'#166534',color:'#166534','&:hover':{bgcolor:'#f0fdf4'},textTransform:'none',mt:1}}>Respond</Button>
                   )}
                 </Box>
               ) : (
                 isAdmin && uploadingAdminFor === req.document_request_id ? (
-                  <Box sx={{mt:1.5}}><AdminUploadPanel requestId={req.document_request_id} /></Box>
+                  <Box sx={{mt:1.5}}><AdminStatusPanel requestId={req.document_request_id} /></Box>
                 ) : isAdmin ? (
-                  <Button size="small" variant="outlined" startIcon={<FileUpload fontSize="inherit" />} onClick={() => setUploadingAdminFor(req.document_request_id)} sx={{borderColor:'#166534',color:'#166534','&:hover':{bgcolor:'#f0fdf4'},textTransform:'none'}}>Upload Response</Button>
+                  <Button size="small" variant="outlined" startIcon={<SendIcon fontSize="inherit" />} onClick={() => setUploadingAdminFor(req.document_request_id)} sx={{borderColor:'#166534',color:'#166534','&:hover':{bgcolor:'#f0fdf4'},textTransform:'none'}}>Respond</Button>
                 ) : (
                   <Typography variant="body2" color="#94a3b8" sx={{fontStyle:'italic'}}>Pending admin response…</Typography>
                 )
-              )}
-
-              {isAdmin && (
-                <>
-                  <Divider sx={{my:2}} />
-                  <Box>
-                    <Typography variant="subtitle2" fontWeight={600} color="#0369a1">Admin Uploads</Typography>
-                    {adminFiles.length === 0 ? (
-                      <Typography variant="body2" color="#94a3b8" sx={{fontStyle:'italic',mt:1}}>No admin uploads.</Typography>
-                    ) : (
-                      <Box sx={{display:'flex',flexDirection:'column',gap:1,mt:1}}>
-                        {adminFiles.map(f => (
-                          <Box key={f.document_request_attachment_id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',px:2,py:1,borderRadius:1,bgcolor:'#f0fdf4',border:'1px solid #bbf7d0'}}>
-                            <Button size="small" component="a" href={fileLink(f.file_path)} target="_blank" rel="noopener noreferrer" startIcon={<Description fontSize="inherit" />}
-                              sx={{justifyContent:'flex-start',textTransform:'none',color:'#166534',fontWeight:600,'&:hover':{bgcolor:'transparent',textDecoration:'underline'}}}>
-                              {f.file_name}
-                            </Button>
-                            <Chip icon={<CheckCircle />} label="Admin" size="small" sx={{bgcolor:'#dcfce7',color:'#166534',fontSize:'0.65rem'}} />
-                          </Box>
-                        ))}
-                      </Box>
-                    )}
-                  </Box>
-                </>
               )}
 
               {req.status === 'REJECTED' && (
@@ -442,28 +330,26 @@ const Documents = () => {
 
       <TableContainer component={Paper} sx={{borderRadius:2,boxShadow:'0 2px 10px rgba(0,0,0,0.05)',mb:4}}>
         <Table>
-          <TableHead sx={{bgcolor:'#f8fafc'}}>
-            <TableRow>
-              <TableCell width="18%">Type</TableCell>
-              <TableCell width="22%">Purpose</TableCell>
-              <TableCell width="13%">Resident</TableCell>
-              <TableCell width="10%">Date</TableCell>
-              <TableCell width="12%">Status</TableCell>
-              <TableCell width="25%" align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {requests.map((req) => {
-              const isOpen = expandedRow === req.document_request_id;
-              const residentFiles = (req.attachments || []).filter(a => !a.is_admin && !a.is_deleted);
-              return (
-                <React.Fragment key={req.document_request_id}>
-                  <TableRow key={req.document_request_id} hover>
-                    <TableCell>{req.type}</TableCell>
-                    <TableCell>{req.purpose}</TableCell>
-                    <TableCell>{req.user?.fullName || ''}</TableCell>
-                    <TableCell>{new Date(req.request_date).toLocaleDateString()}</TableCell>
-                    <TableCell>
+           <TableHead sx={{bgcolor:'#f8fafc'}}>
+             <TableRow>
+               <TableCell width="22%">Type</TableCell>
+               <TableCell width="14%">Resident</TableCell>
+               <TableCell width="12%">Date</TableCell>
+               <TableCell width="14%">Status</TableCell>
+               <TableCell width="38%" align="right">Actions</TableCell>
+             </TableRow>
+           </TableHead>
+           <TableBody>
+             {requests.map((req) => {
+               const isOpen = expandedRow === req.document_request_id;
+               const residentFiles = (req.attachments || []).filter(a => !a.is_admin && !a.is_deleted);
+               return (
+                 <React.Fragment key={req.document_request_id}>
+                    <TableRow key={req.document_request_id} hover>
+                      <TableCell>{req.type}</TableCell>
+                      <TableCell>{req.user?.fullName || ''}</TableCell>
+                      <TableCell>{new Date(req.request_date).toLocaleDateString()}</TableCell>
+                      <TableCell>
                       <Chip label={req.status} size="small" color={getStatusColor(req.status)}
                         onClick={() => setExpandedRow(isOpen ? null : req.document_request_id)}
                         onDelete={() => setExpandedRow(isOpen ? null : req.document_request_id)}
