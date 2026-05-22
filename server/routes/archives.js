@@ -36,7 +36,8 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
         // Restore based on entity type
         switch (entity_type) {
            case 'RESIDENT': {
-             const { linked_user_id, linked_official_id, ...residentData } = entity_data;
+             const { linked_user_id, linked_official_id, user_id, ...residentDataWithoutUserId } = entity_data;
+             const residentData = { ...residentDataWithoutUserId };
              
              // Restore user if exists - check if user already exists first
              let user = null;
