@@ -39,22 +39,23 @@ router.get('/:official_id', authenticate, async (req, res) => {
 // POST /api/officials (Admin only)
 router.post('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const { name, position, contact, term_start, term_end, is_active } = req.body;
+    const { name, position, contact, term_start, term_end, is_active, user_id } = req.body;
 
-const official = await prisma.official.create({
-       data: {
-         name,
-         position,
-         contact,
-         term_start: term_start ? new Date(term_start) : new Date(),
-         term_end: term_end ? new Date(term_end) : null,
-         is_active: is_active ?? true
-       }
-     });
+    const official = await prisma.official.create({
+      data: {
+        name,
+        position,
+        contact,
+        term_start: term_start ? new Date(term_start) : new Date(),
+        term_end: term_end ? new Date(term_end) : null,
+        is_active: is_active ?? true,
+        user_id: user_id || null
+      }
+    });
 
     await logActivity(req.user.id, 'CREATE_OFFICIAL', { official_id: official.official_id, name: official.name }, req);
 
-     res.status(201).json({ message: 'Official added', official });
+    res.status(201).json({ message: 'Official added', official });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to create official' });
@@ -64,7 +65,7 @@ const official = await prisma.official.create({
 // PUT /api/officials/:official_id (Admin only)
 router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
-    const { name, position, contact, term_start, term_end, is_active } = req.body;
+    const { name, position, contact, term_start, term_end, is_active, user_id } = req.body;
 
     const official = await prisma.official.update({
       where: { official_id: parseInt(req.params.official_id) },
@@ -74,46 +75,36 @@ router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) =
         contact,
         term_start: term_start ? new Date(term_start) : undefined,
         term_end: term_end ? new Date(term_end) : undefined,
-        is_active
+        is_active,
+        ...(user_id !== undefined && { user_id })
       }
     });
 
     // ── Sync linked Resident ────────────────────────────────────────────────
-    // Use the direct user_id FK on the officials table for the resident link.
-    // Falls back to the name lookup only when user_id is null (existing data).
+    // Uses the user_id FK relationship: official.user_id → resident.user_id
     let syncRowsRes = 0;
-    await prisma.$transaction(async (tx) => {
-      const newStatus = official.is_active ? 'Active' : 'Inactive';
-
-      if (official.user_id) {
-        // Direct FK link — safe, unambiguous single-row update via Prisma
-        const updated = await tx.resident.updateMany({
-          where: { user_id: official.user_id },
-          data: {
-            ...(name !== undefined && { full_name: name }),
-            ...(contact !== undefined && { contact }),
-            status: newStatus
-          }
-        });
-        syncRowsRes = updated.count;
-      } else {
-        // Fallback: legacy records — find user by exact name first
-        const matchingUser = await tx.user.findFirst({
-          where: { fullName: official.name }
-        });
-
-        if (matchingUser) {
-          const res2 = await tx.$executeRaw`
-            UPDATE residents
-            SET full_name = COALESCE(${official.name}, full_name),
-                contact   = COALESCE(${official.contact}, contact),
-                status    = COALESCE(${newStatus}, status)
-            WHERE user_id = ${matchingUser.user_id}
-          `;
-          syncRowsRes = res2?.affectedRows ?? 0;
+    if (official.user_id) {
+      const updated = await prisma.resident.updateMany({
+        where: { user_id: official.user_id },
+        data: {
+          ...(name !== undefined && { full_name: name }),
+          ...(contact !== undefined && { contact }),
+          status: official.is_active ? 'Active' : 'Inactive'
         }
-      }
-    });
+      });
+      syncRowsRes = updated.count;
+    } else {
+      // Fallback: match by name when user_id not linked
+      const updated = await prisma.resident.updateMany({
+        where: { full_name: { contains: official.name } },
+        data: {
+          ...(name !== undefined && { full_name: name }),
+          ...(contact !== undefined && { contact }),
+          status: official.is_active ? 'Active' : 'Inactive'
+        }
+      });
+      syncRowsRes = updated.count;
+    }
 
     await logActivity(req.user.id, 'UPDATE_OFFICIAL', { official_id: official.official_id, name: official.name, sync_rows: syncRowsRes }, req);
 

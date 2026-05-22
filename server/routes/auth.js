@@ -272,16 +272,10 @@ router.get('/me', authenticate, async (req, res) => {
 
     let response = { user };
     if (user.role === 'OFFICIAL') {
-      // Tagged-template $executeRaw with ${} embeds Prisma auto-parameterisation.
-      const official = await prisma.$executeRaw`
-        SELECT official_id, name, position, contact, term_start, term_end,
-               is_active, created_at
-        FROM officials
-        WHERE LOWER(name) = LOWER(${user.fullName})
-          AND deleted_at IS NULL
-        LIMIT 1
-      `;
-      response.official = official[0] || null;
+      const official = await prisma.official.findFirst({
+        where: { user_id: user.user_id }
+      });
+      response.official = official;
     }
 
     res.json(response);

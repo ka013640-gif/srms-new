@@ -97,14 +97,14 @@ const Officials = () => {
       } else {
         await api.post('officials', formData);
       }
-      handleClose();
       fetchOfficials();
       // Tell the Residents page (if mounted) to refresh so its
       // table stays in sync without the user switching away.
       api.emitRefreshResidents();
+      handleClose();
     } catch (error) {
       console.error('Failed to save official:', error);
-      handleClose();
+      // Keep dialog open on error so user can retry or see error
     }
   };
 
