@@ -18,7 +18,8 @@ model User {
   activityLog    ActivityLog[]
   announcements  Announcement[]
   documents      DocumentRequest[]
-  resident       Resident?
+  resident       Resident?         @relation("ResidentProfile")
+  official       Official?         @relation("OfficialProfile")
 
   @@map("users")
 }
@@ -37,13 +38,14 @@ model Resident {
   status       String    @default("Active")
   created_at   DateTime  @default(now())
   updated_at   DateTime  @updatedAt
-  user         User?     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  user         User?     @relation("ResidentProfile", fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("residents")
 }
 
 model Official {
   official_id Int       @id @default(autoincrement())
+  user_id     Int?      @unique
   name        String
   position    String
   contact     String?
@@ -51,6 +53,7 @@ model Official {
   term_end    DateTime?
   is_active   Boolean   @default(true)
   created_at  DateTime  @default(now())
+  user        User?     @relation("OfficialProfile", fields: [user_id], references: [user_id], onDelete: SetNull)
 
   @@map("officials")
 }

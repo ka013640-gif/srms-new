@@ -156,10 +156,10 @@ router.put('/:id', authenticate, async (req, res) => {
       }
     });
 
-    // ── Change flags — collected BEFORE entering $transaction ────────────
-    const nameChanged    = updated.full_name !== undefined;
-    const contactChanged = updated.contact    !== undefined;
-    const statusChanged  = updated.status     !== undefined;
+    // ── Detect which fields actually changed compared to the pre-update copy ─
+    const nameChanged    = rest.full_name  !== undefined && updated.full_name !== existing.full_name;
+    const contactChanged = rest.contact    !== undefined && updated.contact   !== existing.contact;
+    const statusChanged  = rest.status     !== undefined && updated.status    !== existing.status;
 
     if (!nameChanged && !contactChanged && !statusChanged) {
       await logActivity(req.user.id, 'UPDATE_RESIDENT', { resident_id: updated.resident_id, full_name: updated.full_name }, req);
@@ -195,7 +195,7 @@ router.put('/:id', authenticate, async (req, res) => {
     //
     //  All writes use COALESCE so only changed fields are overwritten.
     await prisma.$transaction(async (tx) => {
-      const is_active = updated.status === 'Active';
+      const is_active = nameChanged ? (updated.status === 'Active') : (existing.status === 'Active');
 
       let userNameForMatch = '';
 
@@ -212,7 +212,7 @@ router.put('/:id', authenticate, async (req, res) => {
       if (!userNameForMatch) {
         const rows2 = await tx.$queryRawUnsafe(
           `SELECT user_id, fullName FROM users WHERE LOWER(fullName) LIKE LOWER(CONCAT('%', ?, '%')) LIMIT 1`,
-          updated.full_name
+          nameChanged ? updated.full_name : existing.full_name
         );
         if (rows2[0]?.fullName) userNameForMatch = rows2[0].fullName;
       }
@@ -230,17 +230,17 @@ router.put('/:id', authenticate, async (req, res) => {
       } else {
         // Step 3: search officials directly by the resident name
         whereClause = `LOWER(name) LIKE LOWER(CONCAT('%', ?, '%'))`;
-        whereValue  = updated.full_name;
+        whereValue  = nameChanged ? updated.full_name : existing.full_name;
       }
 
-// ── Step 3: run the UPDATE ───────────────────────────────────────
+      // ── Step 3: run the UPDATE ───────────────────────────────────────
       await tx.$executeRawUnsafe(
         `UPDATE officials
            SET name      = COALESCE(?, name),
                contact   = COALESCE(?, contact),
                is_active = ?
          WHERE ${whereClause}`,
-        nameChanged  ? updated.full_name  : null,
+        nameChanged  ? updated.full_name   : null,
         contactChanged ? updated.contact   : null,
         is_active,
         whereValue
@@ -272,23 +272,19 @@ router.delete('/:id', authenticate, authorize('ADMIN'), async (req, res) => {
       where: { user_id: resident.user_id }
     }) : null;
 
-    // Find linked official - by user.fullName matching official.name
-    let official = user ? await prisma.official.findFirst({
-      where: { name: user.fullName }
-    }) : null;
-    
-    // Fallback: try to find official by resident's full_name
-    if (!official) {
-      official = await prisma.official.findFirst({
-        where: { name: resident.full_name }
-      });
-    }
+    // Find linked official: query through the explicit user_id FK on the
+    // officials table so we never match by name alone
+    const official = user
+      ? await prisma.official.findFirst({
+          where: { user_id: resident.user_id }
+        })
+      : null;
 
-    console.log('Delete resident cascade:', { 
-      residentId: resident.resident_id, 
+    console.log('Delete resident cascade:', {
+      residentId: resident.resident_id,
       residentName: resident.full_name,
-      foundUser: user?.user_id, 
-      foundOfficial: official?.official_id 
+      foundUser: user?.user_id,
+      foundOfficial: official?.official_id
     });
 
     // Use transaction to ensure atomicity

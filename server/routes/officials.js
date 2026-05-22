@@ -79,37 +79,39 @@ router.put('/:official_id', authenticate, authorize('ADMIN'), async (req, res) =
     });
 
     // ── Sync linked Resident ────────────────────────────────────────────────
-    // $executeRaw is a Prisma tag function — must be called with a
-    // tagged template literal.  Parameters embedded via ${} are
-    // safely parameterised by the Prisma engine.
+    // Use the direct user_id FK on the officials table for the resident link.
+    // Falls back to the name lookup only when user_id is null (existing data).
     let syncRowsRes = 0;
     await prisma.$transaction(async (tx) => {
       const newStatus = official.is_active ? 'Active' : 'Inactive';
 
-      // 1. Resolve via User (exact name match in users table)
-      const matchingUser = await tx.user.findFirst({
-        where: { fullName: official.name }
-      });
-
-      if (matchingUser) {
-        const res = await tx.$executeRaw`
-          UPDATE residents
-          SET full_name = COALESCE(${official.name}, full_name),
-              contact   = COALESCE(${official.contact}, contact),
-              status    = COALESCE(${newStatus}, status)
-          WHERE user_id = ${matchingUser.user_id}
-        `;
-        syncRowsRes = res?.affectedRows ?? 0;
+      if (official.user_id) {
+        // Direct FK link — safe, unambiguous single-row update via Prisma
+        const updated = await tx.resident.updateMany({
+          where: { user_id: official.user_id },
+          data: {
+            ...(name !== undefined && { full_name: name }),
+            ...(contact !== undefined && { contact }),
+            status: newStatus
+          }
+        });
+        syncRowsRes = updated.count;
       } else {
-        // 2. Fallback: fuzzy match via LOWER / CONCAT
-        const res = await tx.$executeRaw`
-          UPDATE residents
-          SET full_name = COALESCE(${official.name}, full_name),
-              contact   = COALESCE(${official.contact}, contact),
-              status    = COALESCE(${newStatus}, status)
-          WHERE LOWER(full_name) LIKE LOWER(CONCAT('%', ${official.name}, '%'))
-        `;
-        syncRowsRes = res?.affectedRows ?? 0;
+        // Fallback: legacy records — find user by exact name first
+        const matchingUser = await tx.user.findFirst({
+          where: { fullName: official.name }
+        });
+
+        if (matchingUser) {
+          const res2 = await tx.$executeRaw`
+            UPDATE residents
+            SET full_name = COALESCE(${official.name}, full_name),
+                contact   = COALESCE(${official.contact}, contact),
+                status    = COALESCE(${newStatus}, status)
+            WHERE user_id = ${matchingUser.user_id}
+          `;
+          syncRowsRes = res2?.affectedRows ?? 0;
+        }
       }
     });
 
@@ -137,36 +139,19 @@ router.delete('/:official_id', authenticate, authorize('ADMIN'), async (req, res
       return res.status(404).json({ error: 'Official not found' });
     }
 
-    // Find linked user - try exact match first, then case-insensitive
-    let user = await prisma.user.findFirst({
-      where: { fullName: official.name }
-    });
-    if (!user) {
-      const users = await prisma.$queryRawUnsafe(
-        `SELECT * FROM users WHERE LOWER(fullName) = LOWER(?) LIMIT 1`,
-        official.name
-      );
-      user = users[0] || null;
-    }
+    // Find linked user via the explicit user_id FK on officials
+    let user = official.user_id
+      ? await prisma.user.findUnique({
+          where: { user_id: official.user_id }
+        })
+      : null;
 
-    // Check if user was already deleted (check if they exist)
-    if (user) {
-      const userCheck = await prisma.user.findUnique({
-        where: { user_id: user.user_id }
-      });
-      if (!userCheck) user = null;
-    }
-
-    // Find linked resident - by user_id or by matching full_name
-    let resident = user ? await prisma.resident.findFirst({
-      where: { user_id: user.user_id }
-    }) : null;
-    
-    if (!resident) {
-      resident = await prisma.resident.findFirst({
-        where: { full_name: official.name }
-      });
-    }
+    // Find linked resident — use the direct user_id relationship
+    let resident = user
+      ? await prisma.resident.findFirst({
+          where: { user_id: user.user_id }
+        })
+      : null;
 
     console.log('Delete official cascade:', { 
       officialId: official.official_id, 

@@ -36,8 +36,7 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
         // Restore based on entity type
         switch (entity_type) {
            case 'RESIDENT': {
-             const { linked_user_id, linked_official_id, user_id, ...residentDataWithoutUserId } = entity_data;
-             const residentData = { ...residentDataWithoutUserId };
+             const { linked_user_id, linked_official_id, ...residentData } = entity_data;
              
              // Restore user if exists - check if user already exists first
              let user = null;
@@ -98,50 +97,49 @@ router.post('/:id/restore', authenticate, authorize('ADMIN'), async (req, res) =
         case 'SESSION':
           await tx.session.create({ data: entity_data });
           break;
-           case 'OFFICIAL': {
-             const { linked_user_id, linked_resident_id, ...officialData } = entity_data;
-             
-             // Restore user if exists - check if user already exists first
-             let user = null;
-             if (linked_user_id) {
-               user = await tx.user.findUnique({
-                 where: { user_id: linked_user_id }
-               });
-               
-               if (!user) {
-                 user = await tx.user.create({
-                   data: {
-                     user_id: linked_user_id,
-                     username: `restored_user_${linked_user_id}`,
-                     password: '',
-                     fullName: officialData.name,
-                     role: 'OFFICIAL'
-                   }
-                 });
-               }
-               
-               // Update official with correct name matching user
-               officialData.name = user.fullName;
-             }
-             
-             // Check if official already exists with this name to avoid conflicts
-             if (linked_user_id) {
-               // For officials, we check by name since they don't have direct user_id link
-               const existingOfficial = await tx.official.findFirst({
-                 where: { name: officialData.name }
-               });
-               if (existingOfficial) {
-                 // If official already exists with this name, update it instead of creating new one
-                 await tx.official.update({
-                   where: { official_id: existingOfficial.official_id },
-                   data: officialData
-                 });
-               } else {
-                 await tx.official.create({ data: officialData });
-               }
-             } else {
-               await tx.official.create({ data: officialData });
-             }
+            case 'OFFICIAL': {
+              const { linked_user_id, linked_resident_id, ...officialData } = entity_data;
+
+              // Restore user if exists - check if user already exists first
+              let user = null;
+              if (linked_user_id) {
+                user = await tx.user.findUnique({
+                  where: { user_id: linked_user_id }
+                });
+
+                if (!user) {
+                  user = await tx.user.create({
+                    data: {
+                      user_id: linked_user_id,
+                      username: `restored_user_${linked_user_id}`,
+                      password: '',
+                      fullName: officialData.name,
+                      role: 'OFFICIAL'
+                    }
+                  });
+                }
+
+                // Update official with correct name matching user
+                officialData.name = user.fullName;
+                officialData.user_id = user.user_id;
+              }
+
+              // Check if official already exists by direct user_id FK
+              if (linked_user_id) {
+                const existingOfficial = await tx.official.findFirst({
+                  where: { user_id: linked_user_id }
+                });
+                if (existingOfficial) {
+                  await tx.official.update({
+                    where: { official_id: existingOfficial.official_id },
+                    data: officialData
+                  });
+                } else {
+                  await tx.official.create({ data: officialData });
+                }
+              } else {
+                await tx.official.create({ data: officialData });
+              }
              
              // Restore linked resident if exists
              if (linked_resident_id) {
