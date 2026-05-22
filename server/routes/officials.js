@@ -19,6 +19,23 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/officials/by-user/:user_id  (resolve official for a linked user)
+router.get('/by-user/:user_id', authenticate, async (req, res) => {
+  try {
+    const official = await prisma.official.findFirst({
+      where: { user_id: parseInt(req.params.user_id) }
+    });
+
+    if (!official) {
+      return res.status(404).json({ error: 'No official record found for this user' });
+    }
+
+    res.json({ official });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch official record' });
+  }
+});
+
 // GET /api/officials/:official_id
 router.get('/:official_id', authenticate, async (req, res) => {
   try {

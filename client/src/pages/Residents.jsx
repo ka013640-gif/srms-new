@@ -65,6 +65,7 @@ const Residents = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [viewResident, setViewResident] = useState(null);
   const [viewResidentUser, setViewResidentUser] = useState(null);
+  const [viewOfficial, setViewOfficial] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
 
   // Full account form state
@@ -232,9 +233,9 @@ const Residents = () => {
     setShowPassword(false);
     try {
       const { data } = await api.get(`residents/${resident.resident_id}`);
-      // API returns { resident: ... } or bare object
       const r = data.resident || data;
       setViewResident(r);
+      setViewOfficial(data.official || null);
       setViewPassword('');
       if (r.user_id) {
         const userRes = await api.get(`users/${r.user_id}`);
@@ -245,11 +246,11 @@ const Residents = () => {
         setViewPassword('');
       }
     } catch (err) {
-      console.error('Failed to fetch resident + user details:', err);
-      const r = resident.resident || resident;
-      setViewResident(r);
+      console.error('Failed to fetch resident details:', err);
+      setViewResident(resident);
       setViewResidentUser(null);
       setViewPassword('');
+      setViewOfficial(null);
     } finally {
       setViewLoading(false);
     }
@@ -879,6 +880,18 @@ const Residents = () => {
                   </Grid>
                 </Grid>
               </Box>
+              {viewOfficial && (
+                <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: '#def7ec', border: '1px solid #84e1bc' }}>
+                  <Typography variant="subtitle2" sx={{ color: '#03543f', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', mb: 1.75 }}>
+                    Barangay Official Information
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <TextField label="Position" fullWidth value={viewOfficial.position || '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f0fdf4', cursor: 'default' } }} />
+                    <TextField label="Term Start" fullWidth value={viewOfficial.term_start ? new Date(viewOfficial.term_start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f0fdf4', cursor: 'default' } }} />
+                    <TextField label="Term End" fullWidth value={viewOfficial.term_end ? new Date(viewOfficial.term_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'} InputProps={{ readOnly: true }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f0fdf4', cursor: 'default' } }} />
+                  </Box>
+                </Box>
+              )}
             </Box>
           ) : null}
         </DialogContent>

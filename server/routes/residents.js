@@ -88,7 +88,16 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    res.json({ resident });
+    // Also fetch linked official (if any) by user_id FK
+    let official = null;
+    if (resident.user_id) {
+      official = await prisma.official.findFirst({
+        where: { user_id: resident.user_id },
+        select: { official_id: true, position: true, contact: true, term_start: true, term_end: true, is_active: true }
+      });
+    }
+
+    res.json({ resident, official });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch resident' });
   }

@@ -119,4 +119,37 @@ router.get('/gender-demographics', async (req, res) => {
   }
 });
 
+// ============================================================
+// DELETE /api/activity/log (Admin only)
+// ============================================================
+router.delete('/log', authenticate, authorize('ADMIN'), async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No activity IDs provided' });
+    }
+
+    const intIds = ids.map(id => parseInt(id)).filter(id => !isNaN(id));
+    if (intIds.length === 0) {
+      return res.status(400).json({ error: 'Invalid activity IDs' });
+    }
+
+    const logIds = intIds.filter(id => id !== req.user.id);
+    if (logIds.length < intIds.length) {
+      const deletedCount = await prisma.activityLog.deleteMany({ where: { activity_log_id: { in: logIds } } });
+      return res.status(207).json({ message: `${deletedCount} activity log(s) deleted (own entries skipped)`, deleted: deletedCount, skipped: intIds.length - logIds.length });
+    }
+
+    const result = await prisma.activityLog.deleteMany({
+      where: { activity_log_id: { in: intIds } }
+    });
+
+    res.json({ message: `${result.count} activity log(s) deleted`, deleted: result.count });
+  } catch (error) {
+    console.error('Delete activity error:', error);
+    res.status(500).json({ error: 'Failed to delete activity log entries' });
+  }
+});
+
 export default router;
